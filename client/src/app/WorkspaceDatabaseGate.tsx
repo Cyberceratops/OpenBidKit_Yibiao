@@ -6,6 +6,7 @@ interface WorkspaceDatabaseGateProps {
 }
 
 const DATABASE_VERSION_TOO_NEW_MARKER = '高于当前客户端支持版本';
+const RELEASES_URL = 'https://github.com/Cyberceratops/OpenBidKit_Yibiao/releases';
 
 const phaseLabels: Record<WorkspaceDatabasePhase, string> = {
   checking: '正在检查本地数据库',
@@ -21,10 +22,7 @@ function WorkspaceDatabaseGate({ children }: WorkspaceDatabaseGateProps) {
   const [showGate, setShowGate] = useState(false);
 
   const openReleasePage = async () => {
-    const url = await window.yibiao?.getUpdateDownloadUrl();
-    if (url) {
-      await window.yibiao?.openExternal(url);
-    }
+    await window.yibiao?.openExternal(RELEASES_URL);
   };
 
   useEffect(() => {
@@ -102,7 +100,7 @@ function WorkspaceDatabaseGate({ children }: WorkspaceDatabaseGateProps) {
           {showReleaseLink && (
             <div className="workspace-database-actions">
               <button type="button" className="primary-action" onClick={openReleasePage}>下载新版客户端</button>
-              <span>将打开当前自动更新渠道的新版下载地址，请下载并安装新版客户端后重试。</span>
+              <span>将打开项目发布页，请下载并安装新版客户端后重试。</span>
             </div>
           )}
         </div>

@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import AppRouter from './app/AppRouter';
-import GpuHardwareAccelerationPrompt from './app/GpuHardwareAccelerationPrompt';
-import LicenseStatusPrompt from './app/LicenseStatusPrompt';
-import RequiredOnlineServicesPrompt from './app/RequiredOnlineServicesPrompt';
-import UpdateNotifier from './app/UpdateNotifier';
 import AppShell from './components/AppShell';
 import { trackAppOpen, trackConfigUsage, trackPageView } from './shared/analytics/analytics';
 import type { SectionId } from './shared/types/navigation';
@@ -49,12 +45,7 @@ function App() {
   };
 
   return (
-    <>
-      <GpuHardwareAccelerationPrompt />
-      <RequiredOnlineServicesPrompt />
-      <UpdateNotifier />
-      <LicenseStatusPrompt />
-      <AppShell
+    <AppShell
         activeSection={activeSection}
         developerMode={developerMode}
         onSectionChange={(section) => { void requestSectionChange(section); }}
@@ -68,8 +59,7 @@ function App() {
             leaveGuardRef.current = guard;
           }}
         />
-      </AppShell>
-    </>
+    </AppShell>
   );
 }
 

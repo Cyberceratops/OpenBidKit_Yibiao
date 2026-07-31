@@ -1065,6 +1065,7 @@ function createOpenCodeRuntimeService({ app, configStore, runtime }) {
   }
 
   async function runTaskNow(payload = {}) {
+    const analyticsStartedAt = Date.now();
     const taskId = payload.task_id || crypto.randomUUID();
     const title = payload.title || '易标智能体任务';
     const outputFile = payload.output_file || 'agent-result.md';
@@ -1125,7 +1126,11 @@ function createOpenCodeRuntimeService({ app, configStore, runtime }) {
       diagnosticsPayload.retryAttempts = [...retryAttempts];
       await writeTaskDiagnostics(taskId, diagnosticsPayload);
 
-      trackAgentRuntime(app, configStore, runtime.id, 'success', { retryCount: result.retry_count || 0 });
+      trackAgentRuntime(app, configStore, runtime.id, 'success', {
+        retryCount: result.retry_count || 0,
+        taskTitle: title,
+        durationMs: Date.now() - analyticsStartedAt,
+      });
 
       const taskResult = {
         success: true,
@@ -1156,7 +1161,11 @@ function createOpenCodeRuntimeService({ app, configStore, runtime }) {
       if (isWatchdogStall(error)) {
         mustRestartAfterTask = true;
       }
-      trackAgentRuntime(app, configStore, runtime.id, 'failed', { retryCount: Array.isArray(error?.agentRetryAttempts) ? error.agentRetryAttempts.length : retryAttempts.length });
+      trackAgentRuntime(app, configStore, runtime.id, 'failed', {
+        retryCount: Array.isArray(error?.agentRetryAttempts) ? error.agentRetryAttempts.length : retryAttempts.length,
+        taskTitle: title,
+        durationMs: Date.now() - analyticsStartedAt,
+      });
       const diagnosticsPayload = await collectDiagnostics({ taskId, title, outputFile });
       if (error && typeof error === 'object') {
         error.agentRetryAttempts = Array.isArray(error.agentRetryAttempts) ? error.agentRetryAttempts : [...retryAttempts];

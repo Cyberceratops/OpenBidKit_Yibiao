@@ -880,6 +880,128 @@ async function ensureAgentRuntimeStatsTable(db) {
   `);
 }
 
+async function queryStatsAgentLatency(env, projectName, range) {
+  const project = sqlString(projectName);
+  const latencyRange = range === 'history' ? '30' : range;
+  const rangeCondition = aeRangeCondition(latencyRange);
+  const stageEventCondition = `(blob2 = 'workflow_stage_runtime' OR (blob2 = 'agent_runtime' AND blob19 NOT IN ('tender-analysis', 'fact-extraction', 'content-generation', 'image-generation')))`;
+  const pipelineStageCondition = `blob19 IN ('tender-analysis', 'outline-extraction', 'outline-generation', 'outline-refinement', 'fact-extraction', 'content-generation', 'content-refinement', 'image-planning', 'image-generation')`;
+  const availabilityResult = await queryAnalytics(env, `
+    SELECT SUM(_sample_interval) AS runCount
+    FROM ${DATASET}
+    WHERE blob1 = ${project}
+      AND ${stageEventCondition}
+      AND ${pipelineStageCondition}
+      AND blob19 != ''
+      AND double5 > 0
+  `);
+  if (number(availabilityResult.data?.[0]?.runCount) <= 0) {
+    return {
+      available: false,
+      windowRange: latencyRange,
+      stages: [],
+      recentRuns: [],
+    };
+  }
+  const [stageResult, trendResult, recentResult] = await Promise.all([
+    queryAnalytics(env, `
+      SELECT
+        if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
+        SUM(_sample_interval) AS runCount,
+        SUM(if(blob20 = 'failed', _sample_interval, 0)) AS failedCount,
+        SUM(double5 * _sample_interval) / SUM(_sample_interval) AS avgDurationMs,
+        quantileExactWeighted(0.5)(double5, _sample_interval) AS p50DurationMs,
+        quantileExactWeighted(0.95)(double5, _sample_interval) AS p95DurationMs,
+        quantileExactWeighted(0.99)(double5, _sample_interval) AS p99DurationMs
+      FROM ${DATASET}
+      WHERE blob1 = ${project}
+        AND ${stageEventCondition}
+        AND ${pipelineStageCondition}
+        AND blob19 != ''
+        AND double5 > 0
+        AND ${rangeCondition}
+      GROUP BY stage
+      ORDER BY avgDurationMs DESC, stage ASC
+      LIMIT 50
+    `),
+    queryAnalytics(env, `
+      SELECT
+        ${businessDateSqlExpression()} AS day,
+        if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
+        SUM(double5 * _sample_interval) / SUM(_sample_interval) AS avgDurationMs
+      FROM ${DATASET}
+      WHERE blob1 = ${project}
+        AND ${stageEventCondition}
+        AND ${pipelineStageCondition}
+        AND blob19 != ''
+        AND double5 > 0
+        AND ${rangeCondition}
+      GROUP BY day, stage
+      ORDER BY day ASC, stage ASC
+      LIMIT 500
+    `),
+    queryAnalytics(env, `
+      SELECT
+        ${businessDateTimeSqlExpression('max(timestamp)')} AS occurredAt,
+        blob5 AS runtime,
+        if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
+        blob20 AS status,
+        double5 AS durationMs
+      FROM ${DATASET}
+      WHERE blob1 = ${project}
+        AND ${stageEventCondition}
+        AND ${pipelineStageCondition}
+        AND blob19 != ''
+        AND double5 > 0
+        AND ${rangeCondition}
+      GROUP BY blob7, runtime, stage, status, durationMs
+      ORDER BY max(timestamp) DESC
+      LIMIT 20
+    `),
+  ]);
+
+  const trendByStage = new Map();
+  for (const row of trendResult.data || []) {
+    const stage = normalizeText(row.stage, 50);
+    if (!stage) continue;
+    if (!trendByStage.has(stage)) trendByStage.set(stage, []);
+    trendByStage.get(stage).push({
+      day: normalizeText(row.day, 20),
+      avgDurationMs: number(row.avgDurationMs),
+    });
+  }
+
+  const stages = (stageResult.data || []).map((row) => {
+    const runCount = number(row.runCount);
+    const failedCount = number(row.failedCount);
+    const stage = normalizeText(row.stage, 50);
+    return {
+      stage,
+      runCount,
+      failedCount,
+      errorRate: runCount > 0 ? failedCount / runCount : 0,
+      avgDurationMs: number(row.avgDurationMs),
+      p50DurationMs: number(row.p50DurationMs),
+      p95DurationMs: number(row.p95DurationMs),
+      p99DurationMs: number(row.p99DurationMs),
+      trend: trendByStage.get(stage) || [],
+    };
+  }).filter((row) => row.stage && row.runCount > 0 && row.avgDurationMs > 0);
+
+  return {
+    available: stages.length > 0,
+    windowRange: latencyRange,
+    stages,
+    recentRuns: (recentResult.data || []).map((row) => ({
+      occurredAt: normalizeText(row.occurredAt, 30),
+      runtime: normalizeText(row.runtime, 40) || 'workflow',
+      stage: normalizeText(row.stage, 50),
+      status: normalizeText(row.status, 20),
+      durationMs: number(row.durationMs),
+    })).filter((row) => row.stage && row.durationMs > 0),
+  };
+}
+
 export async function queryStatsAgentRuntime(env, projectName, range) {
   if (range === 'history') {
     const db = requireStatsDb(env);
@@ -900,7 +1022,10 @@ export async function queryStatsAgentRuntime(env, projectName, range) {
       WHERE project_name = ?
       ORDER BY total_count DESC, runtime ASC, provider ASC, endpoint_host ASC, model ASC
     `, [projectName]);
-    return createAgentRuntimeResponse(rows);
+    return {
+      ...createAgentRuntimeResponse(rows),
+      latency: await queryStatsAgentLatency(env, projectName, range),
+    };
   }
 
   const project = sqlString(projectName);
@@ -917,7 +1042,10 @@ export async function queryStatsAgentRuntime(env, projectName, range) {
     ORDER BY count DESC, metricKey ASC
     LIMIT ${MAX_ANALYTICS_ROWS}
   `);
-  return createAgentRuntimeResponse(createAgentRuntimeRowsFromMetricRows(result.data || []));
+  return {
+    ...createAgentRuntimeResponse(createAgentRuntimeRowsFromMetricRows(result.data || [])),
+    latency: await queryStatsAgentLatency(env, projectName, range),
+  };
 }
 
 export async function queryStatsProjects(env) {

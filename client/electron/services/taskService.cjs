@@ -81,6 +81,11 @@ const taskDefinitions = {
   },
 };
 
+const workflowStageByTaskType = {
+  'bid-analysis': 'tender-analysis',
+  'global-facts-generation': 'fact-extraction',
+};
+
 function now() {
   return new Date().toISOString();
 }
@@ -585,7 +590,16 @@ function createTaskService({ aiService, agentService, technicalPlanStore, reject
     const runnerAgentService = agentService.bindSelectedRuntime(
       () => createAgentUserTaskContext(type, definition, payload, currentTask),
     );
-    runner({ aiService: runnerAiService, agentService: runnerAgentService, workspaceStore: runnerWorkspaceStore, knowledgeBaseService, updateTask, payload, taskControl, previousState }).catch((error) => {
+    const workflowStage = workflowStageByTaskType[type] || '';
+    const workflowStageStartedAt = workflowStage ? Date.now() : 0;
+    runner({ aiService: runnerAiService, agentService: runnerAgentService, workspaceStore: runnerWorkspaceStore, knowledgeBaseService, updateTask, payload, taskControl, previousState }).then(() => {
+      if (workflowStage) {
+        runnerAiService.trackWorkflowStage?.(workflowStage, 'success', Date.now() - workflowStageStartedAt);
+      }
+    }).catch((error) => {
+      if (workflowStage) {
+        runnerAiService.trackWorkflowStage?.(workflowStage, 'failed', Date.now() - workflowStageStartedAt);
+      }
       const failedTask = updateTask({ status: 'error', error: error.message || '任务执行失败' });
       const nextState = updateWorkspaceState(definition, { [taskField]: failedTask });
       emit(failedTask, buildSnapshot(definition, nextState, failedTask));

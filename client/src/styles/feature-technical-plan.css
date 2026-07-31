@@ -3592,7 +3592,7 @@
   margin-top: 18px;
 }
 
-/* [6284-6299] keyframes ai-pulse + compact-placeholder (TechnicalPlanHome空态) */
+/* [6284-6299] keyframes ai-pulse */
 @keyframes ai-pulse {
   0%, 100% {
     transform: scale(0.92);
@@ -3603,44 +3603,5 @@
     transform: scale(1.08);
     box-shadow: 0 0 0 9px rgba(33, 116, 253, 0.04);
   }
-}
-
-.compact-placeholder {
-  position: relative;
-  min-height: 360px;
-}
-
-/* [6301-6332] feature-under-development-overlay */
-.feature-under-development-overlay {
-  position: absolute;
-  top: 28px;
-  left: 50%;
-  z-index: 30;
-  display: grid;
-  width: min(620px, calc(100% - 48px));
-  gap: 8px;
-  padding: 22px 28px;
-  color: #ffffff;
-  text-align: center;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.22), transparent 34%),
-    linear-gradient(135deg, #6b7280 0%, #4b5563 48%, #374151 100%);
-  border: 2px solid rgba(255, 255, 255, 0.34);
-  border-radius: 26px;
-  box-shadow: 0 28px 70px rgba(55, 65, 81, 0.24), 0 8px 24px rgba(23, 32, 51, 0.08);
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.feature-under-development-overlay strong {
-  font-size: clamp(26px, 4vw, 42px);
-  line-height: 1.08;
-  letter-spacing: -0.035em;
-}
-
-.feature-under-development-overlay span {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(16px, 2vw, 22px);
-  font-weight: 900;
 }
 

@@ -2886,6 +2886,20 @@ function withSection(sections, item, partial) {
 }
 
 async function runContentGenerationTask({ aiService, agentService, workspaceStore, knowledgeBaseService, updateTask: updateManagedTask, payload, taskControl, previousState }) {
+  async function runTrackedWorkflowStage(stage, runner, resolveStatus = () => 'success') {
+    const startedAt = Date.now();
+    try {
+      const result = await runner();
+      aiService.trackWorkflowStage?.(stage, resolveStatus(result) === 'failed' ? 'failed' : 'success', Date.now() - startedAt);
+      return result;
+    } catch (error) {
+      if (!isAiQueueScopePausedError(error) && !isContentGenerationPausedError(error)) {
+        aiService.trackWorkflowStage?.(stage, 'failed', Date.now() - startedAt);
+      }
+      throw error;
+    }
+  }
+
   const resume = Boolean(payload.resume);
   const storedPlan = resume ? (previousState || {}) : (workspaceStore.loadTechnicalPlan() || {});
   const wordControl = normalizeOutlineWordControlSnapshot(storedPlan.outlineWordControlSnapshot);
@@ -6382,23 +6396,25 @@ workspace 文件说明：
 
   try {
     if (!runOnlyIllustrationStage && tasksToRun.length) {
-      if (targetItemId) {
-        await prepareSingleSectionPlan();
-        pauseIfRequested('正文生成已在正文编排后暂停，可导出当前已完成内容，稍后继续。');
-        await restoreOriginalMaterialsIfNeeded(tasksToRun);
-        pauseIfRequested('正文生成已在原方案还原阶段暂停，可导出当前已完成内容，稍后继续。');
-        await runItemsWithWorkerPool(tasksToRun, contentConcurrency, runOne, isPauseRequested);
-        pauseIfRequested('正文生成已在正文生成阶段暂停，可导出当前已完成内容，稍后继续。');
-      } else {
-        await planAll();
-        pauseIfRequested('正文生成已在正文编排后暂停，可导出当前已完成内容，稍后继续。');
-        await restoreOriginalMaterialsIfNeeded(tasksToRun);
-        pauseIfRequested('正文生成已在原方案还原阶段暂停，可导出当前已完成内容，稍后继续。');
-        if (tasksToRun.length) {
-          await runContentTargetsWithWarmup(tasksToRun);
+      await runTrackedWorkflowStage('content-generation', async () => {
+        if (targetItemId) {
+          await prepareSingleSectionPlan();
+          pauseIfRequested('正文生成已在正文编排后暂停，可导出当前已完成内容，稍后继续。');
+          await restoreOriginalMaterialsIfNeeded(tasksToRun);
+          pauseIfRequested('正文生成已在原方案还原阶段暂停，可导出当前已完成内容，稍后继续。');
+          await runItemsWithWorkerPool(tasksToRun, contentConcurrency, runOne, isPauseRequested);
           pauseIfRequested('正文生成已在正文生成阶段暂停，可导出当前已完成内容，稍后继续。');
+        } else {
+          await planAll();
+          pauseIfRequested('正文生成已在正文编排后暂停，可导出当前已完成内容，稍后继续。');
+          await restoreOriginalMaterialsIfNeeded(tasksToRun);
+          pauseIfRequested('正文生成已在原方案还原阶段暂停，可导出当前已完成内容，稍后继续。');
+          if (tasksToRun.length) {
+            await runContentTargetsWithWarmup(tasksToRun);
+            pauseIfRequested('正文生成已在正文生成阶段暂停，可导出当前已完成内容，稍后继续。');
+          }
         }
-      }
+      }, () => tasksToRun.some(({ item }) => sections[item.id]?.status === 'error') ? 'failed' : 'success');
     }
 
     if (!runOnlyIllustrationStage && !targetItemId && !retryContentCorrection && !completedStages.has('section-word-adjusting')) {
@@ -6505,7 +6521,17 @@ workspace 文件说明：
         illustrationPlan = await runIllustrationPlanning();
       }
       pauseIfRequested('正文生成已在图片生成前暂停，可导出当前已完成内容，稍后继续。');
-      await runIllustrationGeneration(illustrationPlan);
+      const hasPendingIllustrations = Array.isArray(illustrationPlan?.items)
+        && illustrationPlan.items.some((item) => !['success', 'error'].includes(item.generation?.status));
+      if (hasPendingIllustrations) {
+        await runTrackedWorkflowStage(
+          'image-generation',
+          () => runIllustrationGeneration(illustrationPlan),
+          (result) => result?.items?.some((item) => item.generation?.status === 'error') ? 'failed' : 'success',
+        );
+      } else {
+        await runIllustrationGeneration(illustrationPlan);
+      }
     }
     pauseIfRequested('正文生成已在完成前暂停，可导出当前已完成内容，稍后继续。');
 

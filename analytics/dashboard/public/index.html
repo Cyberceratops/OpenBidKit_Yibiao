@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>埋点统计看板</title>
+  <title>易标遥测仪表盘</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -12,31 +12,42 @@
     <!-- 侧边栏 -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <span class="sidebar-logo">统计看板</span>
+        <div class="sidebar-brand">
+          <span class="sidebar-brand-mark" aria-hidden="true">Y</span>
+          <span class="sidebar-brand-copy">
+            <strong>遥测仪表盘</strong>
+            <small>ANALYTICS</small>
+          </span>
+        </div>
         <button class="sidebar-toggle" id="sidebarToggle" type="button" title="折叠侧边栏">
           <span class="toggle-icon">◀</span>
         </button>
       </div>
 
+      <div class="nav-section-switch" aria-label="导航分区">
+        <button class="nav-section-button active" type="button" data-nav-section="stats" aria-pressed="true">数据统计</button>
+        <button class="nav-section-button" type="button" data-nav-section="system" aria-pressed="false">系统管理</button>
+      </div>
+
       <nav class="sidebar-nav" aria-label="看板导航">
-        <div class="nav-group">
+        <div class="nav-group" data-nav-group="stats">
           <span class="nav-group-label">数据统计</span>
-          <button class="nav-item" type="button" data-tab-button="overview">概览</button>
-          <button class="nav-item" type="button" data-tab-button="clients">客户端统计</button>
-          <button class="nav-item" type="button" data-tab-button="ips">IP 统计</button>
-          <button class="nav-item" type="button" data-tab-button="traffic">访问分析</button>
-          <button class="nav-item" type="button" data-tab-button="config">配置使用</button>
-          <button class="nav-item" type="button" data-tab-button="models">模型使用</button>
-          <button class="nav-item" type="button" data-tab-button="agent">Agent 分析</button>
-          <button class="nav-item" type="button" data-tab-button="latest">最近事件</button>
+          <button class="nav-item" type="button" data-tab-button="overview" data-nav-short="概">总览</button>
+          <button class="nav-item" type="button" data-tab-button="clients" data-nav-short="客">客户端统计</button>
+          <button class="nav-item" type="button" data-tab-button="ips" data-nav-short="IP">IP 统计</button>
+          <button class="nav-item" type="button" data-tab-button="traffic" data-nav-short="访">访问分析</button>
+          <button class="nav-item" type="button" data-tab-button="config" data-nav-short="配">配置用量</button>
+          <button class="nav-item" type="button" data-tab-button="models" data-nav-short="模">模型用量</button>
+          <button class="nav-item" type="button" data-tab-button="agent" data-nav-short="A">Agent 分析</button>
+          <button class="nav-item" type="button" data-tab-button="latest" data-nav-short="事">近期事件</button>
         </div>
-        <div class="nav-group">
+        <div class="nav-group" data-nav-group="system" hidden>
           <span class="nav-group-label">系统管理</span>
-          <button class="nav-item" type="button" data-tab-button="notice">公告管理</button>
-          <button class="nav-item" type="button" data-tab-button="license">授权管理</button>
-          <button class="nav-item" type="button" data-tab-button="resources">资源管理</button>
-          <button class="nav-item" type="button" data-tab-button="plugins">插件管理</button>
-          <button class="nav-item" type="button" data-tab-button="model-info-cache">模型信息缓存</button>
+          <button class="nav-item" type="button" data-tab-button="notice" data-nav-short="公">公告管理</button>
+          <button class="nav-item" type="button" data-tab-button="license" data-nav-short="授">授权管理</button>
+          <button class="nav-item" type="button" data-tab-button="resources" data-nav-short="资">资源管理</button>
+          <button class="nav-item" type="button" data-tab-button="plugins" data-nav-short="插">插件管理</button>
+          <button class="nav-item" type="button" data-tab-button="model-info-cache" data-nav-short="缓">模型信息缓存</button>
         </div>
       </nav>
 
@@ -45,6 +56,7 @@
           <span id="statusDot" class="dot"></span>
           <span id="statusText" class="status-label">未连接</span>
         </div>
+        <span class="sidebar-product">OpenBidKit · Analytics</span>
       </div>
     </aside>
 
@@ -57,7 +69,7 @@
         <div class="topbar-fields">
           <label class="topbar-field">
             <span>API 地址</span>
-            <input id="apiBase" value="https://analytics.agnet.top" />
+            <input id="apiBase" value="https://openbidkit-yibiao-analytics-api.clint-schneider.workers.dev" />
           </label>
           <label class="topbar-field topbar-token">
             <span>ADMIN_TOKEN</span>
@@ -82,6 +94,13 @@
 
         <!-- 概览 -->
         <section id="tab-overview" class="tab-panel" data-tab-panel="overview">
+          <header class="page-heading">
+            <div>
+              <span class="page-eyebrow">TELEMETRY WORKSPACE</span>
+              <h1>数据总览</h1>
+              <p>客户端使用、AI 消耗与服务运行情况</p>
+            </div>
+          </header>
           <section class="cards">
             <div class="panel card"><span>累计打开量</span><strong id="totalOpen">0</strong></div>
             <div class="panel card"><span>累计页面访问量</span><strong id="totalView">0</strong></div>
@@ -93,13 +112,6 @@
             <div class="panel card"><span>今日活跃客户端</span><strong id="todayActiveClients">0</strong></div>
             <div class="panel card"><span>今日新增客户端</span><strong id="todayNewClients">0</strong></div>
             <div class="panel card"><span>7 日新增客户端</span><strong id="last7NewClients">0</strong></div>
-          </section>
-
-          <section class="cards">
-            <div class="panel card"><span>GitHub Stars</span><strong id="githubStars">-</strong></div>
-            <div class="panel card"><span>GitHub Forks</span><strong id="githubForks">-</strong></div>
-            <div class="panel card"><span>Issues / PRs</span><strong id="githubOpenIssues">-</strong></div>
-            <div class="panel card"><span>GitHub 仓库</span><strong><a id="githubRepoUrl" class="card-link" href="https://github.com/FB208/OpenBidKit_Yibiao" target="_blank" rel="noopener noreferrer">打开仓库</a></strong></div>
           </section>
 
           <section class="grid">
@@ -533,7 +545,7 @@
               <input id="pluginId" type="hidden" />
               <label class="plugin-field-wide">
                 GitHub 仓库地址 *
-                <input id="pluginRepository" maxlength="300" placeholder="例如：https://github.com/FB208/OpenBidKit-plugin-pet" required />
+                <input id="pluginRepository" maxlength="300" placeholder="例如：https://github.com/your-name/your-plugin" required />
                 <small>自动读取 Tag 对应的 manifest.json、最新正式 Release 和安装包地址。</small>
               </label>
               <label>

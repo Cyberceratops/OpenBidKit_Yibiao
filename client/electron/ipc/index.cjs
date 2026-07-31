@@ -32,7 +32,6 @@ const { createSystemFontService } = require('../services/systemFontService.cjs')
 const { createTaskService } = require('../services/taskService.cjs');
 const { createTechnicalPlanStore } = require('../services/technicalPlanStore.cjs');
 const { createTemplateStore } = require('../services/templateStore.cjs');
-const { checkRequiredOnlineServices, getRequiredOnlineServiceStatus } = require('../services/requiredOnlineServices.cjs');
 const { initLocalImageRenderService } = require('../services/localImageRenderService.cjs');
 
 function normalizeExternalUrl(value) {
@@ -211,8 +210,7 @@ function registerWorkspaceDatabaseServices({ app, configStore, aiService, agentS
   return { sqliteDatabase };
 }
 
-function registerIpcHandlers({ app, mainWindow, checkAndDownloadUpdate, triggerUpdateDownload, quitAndInstall, getLatestVersion, getUpdateDownloadUrl, gpuStartupState = {}, gpuTrialArg = '--yibiao-trial-hardware-acceleration', forceDisableGpuArgs = [], openDeveloperTokenStatsWindow, closeDeveloperTokenStatsWindow }) {
-  void checkRequiredOnlineServices();
+function registerIpcHandlers({ app, mainWindow, gpuStartupState = {}, gpuTrialArg = '--yibiao-trial-hardware-acceleration', forceDisableGpuArgs = [], openDeveloperTokenStatsWindow, closeDeveloperTokenStatsWindow }) {
   const configStore = createConfigStore(app);
   initLocalImageRenderService({ configStore });
   const licenseService = createLicenseService({ app, configStore });
@@ -349,8 +347,6 @@ function registerIpcHandlers({ app, mainWindow, checkAndDownloadUpdate, triggerU
   }
 
   ipcMain.handle('app:get-version', () => app.getVersion());
-  ipcMain.handle('required-online-services:get-status', () => getRequiredOnlineServiceStatus());
-
   ipcMain.handle('app:get-gpu-hardware-acceleration-status', () => {
     const config = configStore.load();
     return {
@@ -404,49 +400,6 @@ function registerIpcHandlers({ app, mainWindow, checkAndDownloadUpdate, triggerU
       console.warn('[app] 打开外部链接失败', { url: preview, message: error.message || String(error) });
       return { success: false, message: '外部链接打开失败' };
     }
-  });
-
-  ipcMain.handle('app:get-latest-version', () => getLatestVersion({ configStore }));
-  ipcMain.handle('app:get-update-download-url', () => getUpdateDownloadUrl({ configStore }));
-  ipcMain.handle('app:quit-and-install', async () => {
-    await closeServicesBeforeExit();
-    return quitAndInstall({ app });
-  });
-
-  ipcMain.handle('app:check-update', (event) => {
-    const webContents = event.sender;
-    return checkAndDownloadUpdate({
-      app,
-      mainWindow,
-      configStore,
-      onProgress: (percent) => {
-        sendToWebContents(webContents, 'app:update-progress', { percent });
-      },
-      onDownloaded: (version) => {
-        sendToWebContents(webContents, 'app:update-downloaded', { version });
-      },
-      onError: (message) => {
-        sendToWebContents(webContents, 'app:update-error', { message });
-      },
-    });
-  });
-
-  ipcMain.handle('app:start-update', (event) => {
-    const webContents = event.sender;
-    return triggerUpdateDownload({
-      app,
-      mainWindow,
-      configStore,
-      onProgress: (percent) => {
-        sendToWebContents(webContents, 'app:update-progress', { percent });
-      },
-      onDownloaded: (version) => {
-        sendToWebContents(webContents, 'app:update-downloaded', { version });
-      },
-      onError: (message) => {
-        sendToWebContents(webContents, 'app:update-error', { message });
-      },
-    });
   });
 
   return {

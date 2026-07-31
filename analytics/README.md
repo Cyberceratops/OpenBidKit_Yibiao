@@ -6,16 +6,16 @@
 
 | 项目 | 地址 |
 | --- | --- |
-| API | `https://analytics.agnet.top` |
-| Dashboard | `https://static.analytics.agnet.top` |
+| API | `https://openbidkit-yibiao-analytics-api.clint-schneider.workers.dev` |
+| Dashboard | `https://openbidkit-yibiao-analytics-dashboard.clint-schneider.workers.dev` |
 
-生产 API Worker 所在 Cloudflare 账户已启用 Workers Paid Plan。当前共配置 6 个 Cron Trigger：5 个埋点统计触发器和 1 个独立模型信息同步触发器。付费套餐在 Cloudflare 账户侧生效，`wrangler.jsonc` 不存在需要声明的套餐字段，不要再按免费计划 5 个 Cron 上限合并这些任务。
+当前共配置 5 个 Cron Trigger；模型信息同步与最后一个埋点汇总触发器共用同一时刻，兼容 Cloudflare 的 5 个 Cron 配额。
 
 ## 数据源
 
 | 数据源 | Binding | 用途 |
 | --- | --- | --- |
-| Analytics Engine `agnet_analytics` | `ANALYTICS` | 详细事件、今天/7天/30天查询、最近事件、Cron 汇总来源 |
+| Analytics Engine `openbidkit_yibiao_analytics` | `ANALYTICS` | 详细事件、今天/7天/30天查询、最近事件、Cron 汇总来源 |
 | D1 `openbidkit-analytics` | `ANALYTICS_DB` | 新版 `stats_*` 长期统计表 |
 | D1 `openbidkit-resources` | `RESOURCE_DB` | 资源管理元数据 |
 | R2 `openbidkit` | `RESOURCE_BUCKET` | 资源图片 |
@@ -155,7 +155,7 @@ npm run setup:analytics-storage
 
 如果刚删除过 `openbidkit-analytics`，脚本会重新创建并更新 `wrangler.jsonc` 的 `database_id`。
 
-模型信息同步使用独立 Cron `0 20 * * *`（北京时间每天 04:00），从 `models.dev/api.json` 提取按模型 ID 聚合的精简索引。思考强度取同名模型明确档位的交集，`context` 和 `output` 分别取同名记录最大值；同步失败不会覆盖最后一次成功索引。Dashboard 的“模型信息缓存”页面支持查看详细索引、手动同步和人工修改。人工修改按完整模型记录独立保存在 KV 中，公共查询优先使用人工值，定时或手动同步不会覆盖；点击“恢复默认”后立即删除人工覆盖并重新使用最近一次自动同步值。
+模型信息同步与最后一个汇总任务共用 Cron `0 19 * * *`（北京时间每天 03:00），从 `models.dev/api.json` 提取按模型 ID 聚合的精简索引。思考强度取同名模型明确档位的交集，`context` 和 `output` 分别取同名记录最大值；同步失败不会覆盖最后一次成功索引。Dashboard 的“模型信息缓存”页面支持查看详细索引、手动同步和人工修改。人工修改按完整模型记录独立保存在 KV 中，公共查询优先使用人工值，定时或手动同步不会覆盖；点击“恢复默认”后立即删除人工覆盖并重新使用最近一次自动同步值。
 
 ### 3. 部署 Worker
 
@@ -163,7 +163,7 @@ API Worker 配置：
 
 | 项目 | 值 |
 | --- | --- |
-| Worker 名称 | `agnet-analytics-api` |
+| Worker 名称 | `openbidkit-yibiao-analytics-api` |
 | Root directory | `analytics/worker` |
 | Build command | `npm install` |
 | Deploy command | `npm run deploy` |
@@ -172,7 +172,7 @@ Dashboard Worker 配置：
 
 | 项目 | 值 |
 | --- | --- |
-| Worker 名称 | `agnet-analytics-dashboard` |
+| Worker 名称 | `openbidkit-yibiao-analytics-dashboard` |
 | Root directory | `analytics/dashboard` |
 | Build command | `npm install` |
 | Deploy command | `npm run deploy` |
@@ -182,14 +182,14 @@ Dashboard Worker 配置：
 健康检查：
 
 ```powershell
-Invoke-RestMethod -Uri "https://analytics.agnet.top/health"
+Invoke-RestMethod -Uri "https://openbidkit-yibiao-analytics-api.clint-schneider.workers.dev/health"
 ```
 
 上报测试：
 
 ```powershell
 Invoke-RestMethod `
-  -Uri "https://analytics.agnet.top/track" `
+  -Uri "https://openbidkit-yibiao-analytics-api.clint-schneider.workers.dev/track" `
   -Method Post `
   -ContentType "application/json" `
   -Body '{"projectName":"yibiao-client","event":"app_open","version":"0.1.0","platform":"win32","arch":"x64","client_id":"test-client","client_created_at":"2026-06-13"}'
@@ -201,7 +201,7 @@ Invoke-RestMethod `
 
 ```powershell
 Invoke-RestMethod `
-  -Uri "https://analytics.agnet.top/api/overview?projectName=yibiao-client" `
+  -Uri "https://openbidkit-yibiao-analytics-api.clint-schneider.workers.dev/api/overview?projectName=yibiao-client" `
   -Method Get `
   -Headers @{ Authorization = "Bearer <ADMIN_TOKEN>" }
 ```
@@ -279,7 +279,7 @@ npm run backfill:overview-ai-totals
 
 ```powershell
 cd analytics\worker
-npx wrangler tail agnet-analytics-api --format pretty
+npx wrangler tail openbidkit-yibiao-analytics-api --format pretty
 ```
 
 ## 自动部署触发规则
@@ -288,8 +288,8 @@ Cloudflare Workers Builds 会在生产分支推送时触发构建。部署脚本
 
 | Worker | 监听目录 |
 | --- | --- |
-| `agnet-analytics-api` | `analytics/worker` |
-| `agnet-analytics-dashboard` | `analytics/dashboard` |
+| `openbidkit-yibiao-analytics-api` | `analytics/worker` |
+| `openbidkit-yibiao-analytics-dashboard` | `analytics/dashboard` |
 
 强制部署可临时设置：
 

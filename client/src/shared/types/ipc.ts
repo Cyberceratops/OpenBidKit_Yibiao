@@ -1,6 +1,6 @@
 import type { AiHttpErrorPayload, ChatCompletionRequest, JsonCompletionRequest } from './ai';
 import type { DuplicateCheckWorkspaceState, FileSelectionResult } from './bid';
-import type { ClientConfig, ConfigSaveResult, ImageModelTestResult, ModelInfoResult, ModelListResult, UpdateChannel } from './config';
+import type { ClientConfig, ConfigSaveResult, ImageModelTestResult, ModelInfoResult, ModelListResult } from './config';
 import type { KnowledgeAnalysisSnapshot, KnowledgeBaseEvent, KnowledgeBaseIndex, KnowledgeBaseIndexMutationResult, KnowledgeBaseMigrationResult, KnowledgeBaseMigrationStatus, KnowledgeBaseMutationResult, KnowledgeBaseRetryDocumentResult, KnowledgeBaseStartMatchingResult, KnowledgeBaseUploadResult, KnowledgeDocument, KnowledgeFolder, KnowledgeItem } from '../../features/knowledge-base/types';
 import type { RejectionCheckWorkspaceState, RejectionDocumentRole } from '../../features/rejection-check/types';
 import type { BidAnalysisMode, BidAnalysisTaskState, BidSectionMode, ContentGenerationOptions, ContentGenerationPlanState, ContentGenerationProgressDetail, ContentGenerationRuntimeState, ContentGenerationSectionState, DetectedBidSection, GlobalFactGroupState, SaveOutlineRequest, TechnicalPlanState, TechnicalPlanStep, TechnicalPlanWorkflowKind } from '../../features/technical-plan/types';
@@ -47,20 +47,6 @@ export interface WordExportResult {
   path?: string;
   message?: string;
   warnings?: string[];
-}
-
-export interface RequiredOnlineServiceStatus {
-  id: string;
-  label: string;
-  domain: string;
-  available: boolean;
-  checked: boolean;
-}
-
-export interface RequiredOnlineServicesStatus {
-  checked: boolean;
-  services: RequiredOnlineServiceStatus[];
-  unavailableServices: RequiredOnlineServiceStatus[];
 }
 
 export interface DeveloperTextTokenStats {
@@ -118,31 +104,6 @@ export interface DeveloperExpansionReplaceTestResult {
   originalContent: string;
   selectedText: string;
   nextContent: string;
-}
-
-export interface LatestReleaseInfo {
-  version: string;
-  name: string;
-  body: string;
-  published_at: string;
-  html_url: string;
-  download_url?: string;
-  channel?: UpdateChannel;
-}
-
-export interface UpdateCheckResult {
-  enabled: boolean;
-  updateAvailable: boolean;
-  version?: string;
-  downloaded?: boolean;
-  failed?: boolean;
-  message?: string;
-  channel?: UpdateChannel;
-}
-
-export interface UpdateInstallResult {
-  success: boolean;
-  message?: string;
 }
 
 export interface GpuHardwareAccelerationStatus {
@@ -381,18 +342,7 @@ export interface YibiaoBridge {
   saveGpuHardwareAccelerationPreference: (enabled: boolean) => Promise<ConfigSaveResult & { enabled: boolean; configured: boolean; restartRequired: boolean }>;
   startGpuHardwareAccelerationTrial: () => Promise<{ success: boolean }>;
   relaunchWithGpuHardwareAccelerationDisabled: () => Promise<{ success: boolean }>;
-  requiredOnlineServices: {
-    getStatus: () => Promise<RequiredOnlineServicesStatus>;
-  };
-  getLatestVersion: () => Promise<LatestReleaseInfo>;
-  getUpdateDownloadUrl: () => Promise<string>;
   openExternal: (url: string) => Promise<{ success: boolean; message?: string }>;
-  checkUpdate: () => Promise<UpdateCheckResult>;
-  startUpdate: () => Promise<UpdateCheckResult>;
-  quitAndInstall: () => Promise<UpdateInstallResult>;
-  onUpdateProgress: (callback: (event: { percent: number }) => void) => () => void;
-  onUpdateDownloaded: (callback: (event: { version: string }) => void) => () => void;
-  onUpdateError: (callback: (event: { message: string }) => void) => () => void;
   database: {
     getStatus: () => Promise<WorkspaceDatabaseStatus>;
     onStatus: (callback: (status: WorkspaceDatabaseStatus) => void) => () => void;
@@ -579,5 +529,3 @@ export interface AvailablePlugin {
     message: string;
   };
 }
-
-

@@ -2,7 +2,6 @@ import * as Tooltip from '@radix-ui/react-tooltip';
 import { useState, type ComponentType, type ReactElement, type SVGProps } from 'react';
 import { getAppMenuItems, getParentMenuItemBySection } from '../app/menuConfig';
 import type { AppMenuItem, SectionId } from '../shared/types/navigation';
-import { useToast } from '../shared/ui';
 import logoUrl from '../../assets/icon_256.png';
 
 interface SidebarProps {
@@ -15,20 +14,15 @@ const navigationIcons: Record<SectionId, ComponentType<SVGProps<SVGSVGElement>>>
   'bid-generation': BidGenerationIcon,
   'technical-plan': DocumentIcon,
   'existing-plan-expansion': DocumentIcon,
-  'business-bid': BriefcaseIcon,
   'knowledge-base': ArchiveIcon,
   'document-knowledge-base': ArchiveIcon,
-  'image-knowledge-base': ArchiveIcon,
-  resources: ResourcesIcon,
   'bid-check': BidCheckIcon,
   'duplicate-check': CompareIcon,
   'rejection-check': ShieldIcon,
-  'ai-evaluation': BidCheckIcon,
   'template-settings': DocumentIcon,
   'my-templates': DocumentIcon,
   'new-template': DocumentIcon,
   'export-format': DocumentIcon,
-  'bid-opportunity': RadarIcon,
   'developer-test': FlaskIcon,
   'developer-json-test': FlaskIcon,
   'developer-prompt-lab': FlaskIcon,
@@ -40,30 +34,13 @@ const navigationIcons: Record<SectionId, ComponentType<SVGProps<SVGSVGElement>>>
   settings: GearIcon,
 };
 
-const USER_GUIDE_URL = 'https://wiki.agnet.top/';
-
 function Sidebar({ activeSection, developerMode, onSectionChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const { showToast } = useToast();
   const menuItems = getAppMenuItems(developerMode);
   const activeParent = getParentMenuItemBySection(activeSection, developerMode);
 
   const handleMenuItemClick = (item: AppMenuItem) => {
-    if (!item.notice) {
-      onSectionChange(item.id);
-      return;
-    }
-
-    showToast(item.notice.message, 'info', {
-      duration: 7000,
-      actions: item.notice.externalUrl ? [
-        {
-          label: item.notice.actionLabel || '打开链接',
-          variant: 'primary',
-          onClick: () => openExternalUrl(item.notice?.externalUrl || ''),
-        },
-      ] : undefined,
-    });
+    onSectionChange(item.id);
   };
 
   return (
@@ -117,22 +94,10 @@ function Sidebar({ activeSection, developerMode, onSectionChange }: SidebarProps
       </nav>
 
       <div className="sidebar-footer">
-        {collapsed ? wrapTooltip('使用文档', renderUserGuideButton()) : renderUserGuideButton()}
         {collapsed ? wrapTooltip('设置', renderSettingsButton(activeSection, onSectionChange)) : renderSettingsButton(activeSection, onSectionChange)}
       </div>
     </aside>
   );
-}
-
-async function openExternalUrl(url: string) {
-  if (!url) return;
-
-  if (window.yibiao?.openExternal) {
-    await window.yibiao.openExternal(url);
-    return;
-  }
-
-  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function renderSettingsButton(activeSection: SectionId, onSectionChange: (section: SectionId) => void) {
@@ -152,25 +117,6 @@ function renderSettingsButton(activeSection: SectionId, onSectionChange: (sectio
       <span className="settings-copy">
         <strong>设置</strong>
         <small>模型与解析配置</small>
-      </span>
-    </button>
-  );
-}
-
-function renderUserGuideButton() {
-  return (
-    <button
-      type="button"
-      className="settings-trigger"
-      onClick={() => void openExternalUrl(USER_GUIDE_URL)}
-      aria-label="使用文档"
-    >
-      <span className="nav-icon" aria-hidden="true">
-        <BookIcon />
-      </span>
-      <span className="settings-copy">
-        <strong>使用文档</strong>
-        <small>教程与功能共创</small>
       </span>
     </button>
   );
@@ -213,34 +159,12 @@ function DocumentIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-function BriefcaseIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <path d="M5 8h14v11.5H5z" />
-      <path d="M9 8V5.5h6V8" />
-      <path d="M5 12.5h14" />
-      <path d="M10.5 12.5v2h3v-2" />
-    </svg>
-  );
-}
-
 function ArchiveIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
       <path d="M5 7.5h14v12H5z" />
       <path d="M4 4.5h16v3H4z" />
       <path d="M9 11.2h6" />
-    </svg>
-  );
-}
-
-function ResourcesIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <path d="M4.8 6.4h4v12.2h-4z" />
-      <path d="M10.1 4.8h4.2v13.8h-4.2z" />
-      <path d="m15.4 7.1 3.4-.9 2.7 10.8-3.4.85z" />
-      <path d="M4 19.3h16.8" />
     </svg>
   );
 }
@@ -281,17 +205,6 @@ function ShieldIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-function RadarIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <path d="M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17Z" />
-      <path d="M12 16.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Z" />
-      <path d="M12 12 18 6" />
-      <path d="M12 12h.01" />
-    </svg>
-  );
-}
-
 function FlaskIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
@@ -319,17 +232,6 @@ function PluginIcon(props: SVGProps<SVGSVGElement>) {
       <path d="M16 3v5" />
       <path d="M6 8h12v2a6 6 0 0 1-12 0z" />
       <path d="M12 16v5" />
-    </svg>
-  );
-}
-
-function BookIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <path d="M5.5 4.5h5.2c1.25 0 2.3 1.05 2.3 2.3v12.7c-.45-.8-1.25-1.3-2.3-1.3H5.5z" />
-      <path d="M18.5 4.5h-5.2C12.05 4.5 11 5.55 11 6.8v12.7c.45-.8 1.25-1.3 2.3-1.3h5.2z" />
-      <path d="M8 8h2" />
-      <path d="M14 8h2" />
     </svg>
   );
 }

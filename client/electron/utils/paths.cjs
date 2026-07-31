@@ -121,16 +121,16 @@ function getBundledOpencodeBinaryPath(app) {
 }
 
 function getBundledAgentToolsBinDir(app) {
-  if (process.env.YIBIAO_OPENCODE_TOOLS_BIN_DIR) {
-    return process.env.YIBIAO_OPENCODE_TOOLS_BIN_DIR;
+  if (process.env.YIBIAO_AGENT_TOOLS_BIN_DIR) {
+    return process.env.YIBIAO_AGENT_TOOLS_BIN_DIR;
   }
 
   const platformArch = getPlatformArchKey();
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'opencode-tools', platformArch, 'bin');
+    return path.join(process.resourcesPath, 'agent-tools', platformArch, 'bin');
   }
 
-  return path.join(__dirname, '..', '..', 'vendor', 'opencode-tools', platformArch, 'bin');
+  return path.join(__dirname, '..', '..', 'vendor', 'agent-tools', platformArch, 'bin');
 }
 
 module.exports = {

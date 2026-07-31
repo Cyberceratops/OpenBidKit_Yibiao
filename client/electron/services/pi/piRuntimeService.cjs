@@ -424,6 +424,7 @@ function createPiRuntimeService({ app, configStore, runtime, aiService }) {
   // 执行单个 Pi Agent 任务，并保持业务输出协议一致。
   async function runTask(payload = {}) {
     if (activeTask) throw new Error(`${runtimeName} 正在执行其他任务`);
+    const analyticsStartedAt = Date.now();
     const taskId = payload.task_id || crypto.randomUUID();
     const title = payload.title || '易标智能体任务';
     const outputFile = payload.output_file || 'agent-result.md';
@@ -560,7 +561,11 @@ function createPiRuntimeService({ app, configStore, runtime, aiService }) {
         },
       };
       await writeJsonAsync(path.join(archive.taskDir, 'result.json'), result);
-      trackAgentRuntime(app, configStore, runtimeId, 'success', { retryCount });
+      trackAgentRuntime(app, configStore, runtimeId, 'success', {
+        retryCount,
+        taskTitle: title,
+        durationMs: Date.now() - analyticsStartedAt,
+      });
       return result;
     } catch (error) {
       let output = { path: '', content: '' };
@@ -586,7 +591,11 @@ function createPiRuntimeService({ app, configStore, runtime, aiService }) {
           error: serializeDiagnosticError(error),
         };
       }
-      trackAgentRuntime(app, configStore, runtimeId, 'failed', { retryCount: retryAttempts.length });
+      trackAgentRuntime(app, configStore, runtimeId, 'failed', {
+        retryCount: retryAttempts.length,
+        taskTitle: title,
+        durationMs: Date.now() - analyticsStartedAt,
+      });
       throw error;
     } finally {
       unsubscribe?.();

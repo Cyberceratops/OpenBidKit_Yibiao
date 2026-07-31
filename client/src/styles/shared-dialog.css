@@ -102,8 +102,7 @@
 
 .content-regenerate-card > [data-radix-dialog-description],
 .content-regenerate-card > .content-regenerate-description,
-.content-regenerate-card > textarea,
-.content-regenerate-card > .gpu-acceleration-copy {
+.content-regenerate-card > textarea {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;

@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { SectionId } from '../shared/types/navigation';
 import { getAppMenuItemById } from './menuConfig';
-import BidOpportunityPage from '../features/bid-opportunity/pages/BidOpportunityPage';
-import BusinessBidPage from '../features/business-bid/pages/BusinessBidPage';
 import ContentExpansionReplaceTestPage from '../features/developer/pages/ContentExpansionReplaceTestPage';
 import DeveloperDemoPage, { isDeveloperDemoSection } from '../features/developer/pages/DeveloperDemoPage';
 import AgentTestPage from '../features/developer/pages/AgentTestPage';
@@ -12,7 +10,6 @@ import MyTemplatesPage from '../features/export-format/pages/MyTemplatesPage';
 import DuplicateCheckPage from '../features/duplicate-check/pages/DuplicateCheckPage';
 import KnowledgeBasePage from '../features/knowledge-base/pages/KnowledgeBasePage';
 import RejectionCheckPage from '../features/rejection-check/pages/RejectionCheckPage';
-import ResourcesPage from '../features/resources/pages/ResourcesPage';
 import PluginsPage from '../features/plugins/pages/PluginsPage';
 import SettingsPage from '../features/settings/pages/SettingsPage';
 import TechnicalPlanHome from '../features/technical-plan/pages/TechnicalPlanHome';
@@ -49,12 +46,8 @@ function AppRouter({ activeSection, developerMode, onDeveloperModeChange, onSect
       return <TechnicalPlanHome workflowKind="technical-plan" registerLeaveGuard={registerLeaveGuard} onSectionChange={onSectionChange} />;
     case 'existing-plan-expansion':
       return <TechnicalPlanHome workflowKind="existing-plan-expansion" registerLeaveGuard={registerLeaveGuard} onSectionChange={onSectionChange} />;
-    case 'business-bid':
-      return <BusinessBidPage />;
     case 'document-knowledge-base':
       return <KnowledgeBasePage />;
-    case 'resources':
-      return <ResourcesPage />;
     case 'plugin-manager':
       return <PluginsPage />;
     case 'duplicate-check':
@@ -69,8 +62,6 @@ function AppRouter({ activeSection, developerMode, onDeveloperModeChange, onSect
       return <ExportFormatPage mode="create" />;
     case 'export-format':
       return <ExportFormatPage mode="create" />;
-    case 'bid-opportunity':
-      return <BidOpportunityPage />;
     case 'developer-test':
       return null;
     case 'developer-json-test':

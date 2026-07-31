@@ -6,10 +6,11 @@ const { execFileSync } = require('node:child_process');
 const { dialog } = require('electron');
 const { fetch } = require('undici');
 const { getLicenseFilePath } = require('../utils/paths.cjs');
+const { buildServiceUrl } = require('./serviceEndpoints.cjs');
 
 const packageJson = require('../../package.json');
 
-const LICENSE_ENDPOINT = process.env.YIBIAO_LICENSE_ENDPOINT || 'https://analytics.agnet.top/license/activate';
+const LICENSE_ENDPOINT = process.env.YIBIAO_LICENSE_ENDPOINT || buildServiceUrl('/license/activate');
 const PROJECT_NAME = packageJson.name || 'yibiao-client';
 const APP_ID = packageJson.build?.appId || 'com.yibiao.openbidkit';
 const PRODUCT_NAME = packageJson.build?.productName || '易标投标工具箱';

@@ -1,8 +1,9 @@
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { utilityProcess } = require('electron');
+const { buildServiceUrl } = require('../serviceEndpoints.cjs');
 
-const ANALYTICS_ENDPOINT = process.env.YIBIAO_AGENT_ERROR_ENDPOINT || 'https://analytics.agnet.top/agent-errors';
+const ANALYTICS_ENDPOINT = process.env.YIBIAO_AGENT_ERROR_ENDPOINT || buildServiceUrl('/agent-errors');
 const PROJECT_NAME = 'yibiao-client';
 const REPORT_SCHEMA_VERSION = 1;
 const MAX_COMPRESSED_BYTES = 95 * 1024 * 1024;

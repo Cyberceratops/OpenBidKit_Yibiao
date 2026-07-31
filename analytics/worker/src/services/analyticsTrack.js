@@ -1,7 +1,9 @@
 import {
+  AGENT_RUNTIME_MAX_DURATION_MS,
   AGENT_RUNTIME_KIND_PATTERN,
   AGENT_RUNTIME_MAX_RETRY_COUNT,
   AGENT_RUNTIME_STATUSES,
+  AGENT_TASK_STAGE_PATTERN,
   ALLOWED_EVENTS,
 } from '../constants.js';
 import { isValidProjectName, normalizeMetricValue, normalizeText } from '../utils.js';
@@ -16,6 +18,12 @@ function normalizeAgentRetryCount(value) {
   return Number.isFinite(number) && number > 0
     ? Math.min(AGENT_RUNTIME_MAX_RETRY_COUNT, Math.floor(number))
     : 0;
+}
+
+function normalizeAgentDurationMs(value) {
+  const number = Math.floor(Number(value || 0));
+  if (!Number.isFinite(number) || number <= 0) return 0;
+  return Math.min(AGENT_RUNTIME_MAX_DURATION_MS, number);
 }
 
 function encodeAgentRuntimeMetricPart(value, maxLength) {
@@ -81,6 +89,7 @@ function normalizeClientIp(request) {
 }
 
 function createMetricBlobs(event) {
+  const isStageRuntime = event.event === 'agent_runtime' || event.event === 'workflow_stage_runtime';
   const blob9 = event.event === 'ai_request'
     ? event.aiModelProvider
     : event.event === 'resource_click'
@@ -117,8 +126,8 @@ function createMetricBlobs(event) {
     event.licenseExpiresAt,
     event.sourceTrusted,
     event.untrustedReason,
-    '',
-    '',
+    isStageRuntime ? event.agentTaskStage : '',
+    isStageRuntime ? event.agentRuntimeStatus : '',
   ];
 }
 
@@ -129,8 +138,12 @@ export function normalizeTrackBody(body, request) {
   const aiRequestType = normalizeText(body.ai_request_type || body.aiRequestType, 20);
   const aiModelName = normalizeText(body.ai_model_name || body.aiModelName, 160);
   const agentRuntimeKind = normalizeText(body.agent_runtime_kind || body.agentRuntimeKind, 40);
-  const agentRuntimeStatus = normalizeText(body.agent_runtime_status || body.agentRuntimeStatus, 20);
+  const agentRuntimeStatus = normalizeText(body.agent_runtime_status || body.agentRuntimeStatus || body.workflow_status || body.workflowStatus, 20);
   const agentRuntimeRetryCount = normalizeAgentRetryCount(body.agent_runtime_retry_count ?? body.agentRuntimeRetryCount);
+  const agentTaskStage = normalizeText(body.agent_task_stage || body.agentTaskStage || body.workflow_stage || body.workflowStage, 50);
+  const agentRuntimeDurationMs = normalizeAgentDurationMs(
+    body.agent_runtime_duration_ms ?? body.agentRuntimeDurationMs ?? body.workflow_duration_ms ?? body.workflowDurationMs,
+  );
 
   const event = {
     projectName: normalizeText(body.projectName || body.project_name, 80),
@@ -152,6 +165,8 @@ export function normalizeTrackBody(body, request) {
     agentRuntimeKind,
     agentRuntimeStatus,
     agentRuntimeRetryCount,
+    agentTaskStage,
+    agentRuntimeDurationMs,
     agentRuntimeMetricKey: createAgentRuntimeMetricKey(
       agentRuntimeKind,
       agentRuntimeStatus,
@@ -170,7 +185,7 @@ export function normalizeTrackBody(body, request) {
     totalTokens,
   };
   event.blobs = createMetricBlobs(event);
-  event.doubles = [1, promptTokens, completionTokens, totalTokens];
+  event.doubles = [1, promptTokens, completionTokens, totalTokens, agentRuntimeDurationMs];
   return event;
 }
 
@@ -179,6 +194,10 @@ export function validateTrackEvent(event) {
   if (!ALLOWED_EVENTS.has(event.event)) return 'invalid event';
   if (event.event === 'agent_runtime' && !AGENT_RUNTIME_KIND_PATTERN.test(event.agentRuntimeKind)) return 'invalid agent_runtime_kind';
   if (event.event === 'agent_runtime' && !AGENT_RUNTIME_STATUSES.has(event.agentRuntimeStatus)) return 'invalid agent_runtime_status';
+  if (event.event === 'agent_runtime' && event.agentTaskStage && !AGENT_TASK_STAGE_PATTERN.test(event.agentTaskStage)) return 'invalid agent_task_stage';
+  if (event.event === 'workflow_stage_runtime' && !AGENT_TASK_STAGE_PATTERN.test(event.agentTaskStage)) return 'invalid workflow_stage';
+  if (event.event === 'workflow_stage_runtime' && !AGENT_RUNTIME_STATUSES.has(event.agentRuntimeStatus)) return 'invalid workflow_status';
+  if (event.event === 'workflow_stage_runtime' && !event.agentRuntimeDurationMs) return 'invalid workflow_duration_ms';
   if (!event.clientId) return 'missing client_id';
   if (!event.clientCreatedAt) return 'missing client_created_at';
   if (!event.version) return 'missing version';

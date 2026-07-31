@@ -13,7 +13,7 @@ import { loadPlugins, setupPluginsPage } from './pages/plugins.js';
 import { loadTraffic } from './pages/traffic.js';
 import { setError, setStatus, updateIpPager, updateLatestPager } from './render.js';
 import { appState, state } from './state.js';
-import { activateTab, getInitialTab } from './tabs.js';
+import { activateSection, activateTab, getInitialTab } from './tabs.js';
 
 const tabLoaders = {
   overview: () => loadOverview(),
@@ -151,6 +151,14 @@ function bindEvents() {
   for (const button of state.tabButtons) {
     button.addEventListener('click', () => {
       activateTab(button.dataset.tabButton);
+      document.body.classList.remove('sidebar-drawer-open');
+      void refreshActiveTab({ resetLatestPage: true, resetIpPage: true, resetAgentErrorPage: true });
+    });
+  }
+
+  for (const button of state.navSectionButtons) {
+    button.addEventListener('click', () => {
+      activateSection(button.dataset.navSection);
       void refreshActiveTab({ resetLatestPage: true, resetIpPage: true, resetAgentErrorPage: true });
     });
   }

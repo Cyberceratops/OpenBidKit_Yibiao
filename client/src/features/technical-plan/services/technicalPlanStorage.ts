@@ -6,7 +6,6 @@ const validSteps: TechnicalPlanStep[] = [
   'outline-generation',
   'global-facts',
   'content-edit',
-  'expand',
 ];
 
 function isTechnicalPlanState(state: TechnicalPlanState | null): state is TechnicalPlanState {

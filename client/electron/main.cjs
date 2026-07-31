@@ -3,7 +3,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { registerIpcHandlers } = require('./ipc/index.cjs');
-const { setupAutoUpdate, checkAndDownloadUpdate, triggerUpdateDownload, quitAndInstall, getLatestVersion, getUpdateDownloadUrl } = require('./services/updateService.cjs');
 const { getConfigFilePath, getGeneratedImagesDir, getGpuStartupProbePath, getImportedImagesDir } = require('./utils/paths.cjs');
 
 const rendererUrl = process.env.ELECTRON_RENDERER_URL;
@@ -424,18 +423,12 @@ app.whenReady().then(() => {
   services = registerIpcHandlers({
     app,
     mainWindow,
-    checkAndDownloadUpdate,
-    triggerUpdateDownload,
-    quitAndInstall,
-    getLatestVersion,
-    getUpdateDownloadUrl,
     gpuStartupState,
     gpuTrialArg: GPU_HARDWARE_ACCELERATION_TRIAL_ARG,
     forceDisableGpuArgs: FORCE_DISABLE_GPU_ARGS,
     openDeveloperTokenStatsWindow,
     closeDeveloperTokenStatsWindow,
   });
-  setupAutoUpdate({ app, mainWindow });
   mainWindow.on('closed', () => {
     closeDeveloperTokenStatsWindow();
   });

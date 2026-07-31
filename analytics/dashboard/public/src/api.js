@@ -1,6 +1,6 @@
 import { state } from './state.js';
 
-const productionApiBase = 'https://analytics.agnet.top';
+const productionApiBase = 'https://openbidkit-yibiao-analytics-api.clint-schneider.workers.dev';
 const projectOptionsCacheTtl = 60_000;
 let projectOptionsLoadedAt = 0;
 let projectOptionsRequest = null;

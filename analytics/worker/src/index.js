@@ -79,8 +79,11 @@ export default {
   async scheduled(event, env) {
     const cron = event?.cron || '';
     if (cron === MODEL_INFO_SYNC_CRON) {
-      await syncModelInfoCache(env, 'cron');
-      return;
+      try {
+        await syncModelInfoCache(env, 'cron');
+      } catch (error) {
+        console.error('[analytics] model info sync failed', error?.message || String(error));
+      }
     }
     await rollupYesterdayCronStage(env, cron);
     if (cron === '0 19 * * *') {

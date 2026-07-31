@@ -7,11 +7,9 @@ const {
   normalizeAgentRuntimeId,
 } = require('./agent/agentRuntimeRegistry.cjs');
 
-const textModelProviders = ['jinlong', 'volcengine', 'deepseek', 'agnes', 'custom'];
-const legacyTextModelProviders = ['longcat'];
-const imageModelProviders = ['jinlong', 'volcengine', 'google-ai-studio', 'agnes', 'custom'];
+const textModelProviders = ['deepseek', 'custom'];
+const imageModelProviders = ['google-ai-studio', 'custom'];
 const aiRequestModes = ['normal', 'stream'];
-const updateChannels = ['github', 'cloudflare'];
 const DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT = 400000;
 const DEFAULT_TEXT_CONCURRENCY_LIMIT = 10;
 const DEFAULT_TEXT_TEMPERATURE = 0.7;
@@ -28,51 +26,15 @@ const defaultAgentModeScenarios = {
 };
 
 const textProviderBaseUrls = {
-  jinlong: 'https://jlaudeapi.com/v1',
-  volcengine: 'https://ark.cn-beijing.volces.com/api/v3',
   deepseek: 'https://api.deepseek.com',
-  agnes: 'https://apihub.agnes-ai.com/v1',
   custom: '',
 };
 
 const defaultTextModelProfiles = {
-  jinlong: {
-    api_key: '',
-    base_url: textProviderBaseUrls.jinlong,
-    model_name: 'gpt-3.5-turbo',
-    reasoning_effort: '',
-    context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT,
-    concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT,
-    temperature_enabled: false,
-    temperature: DEFAULT_TEXT_TEMPERATURE,
-    request_mode: 'stream',
-  },
-  volcengine: {
-    api_key: '',
-    base_url: textProviderBaseUrls.volcengine,
-    model_name: '',
-    reasoning_effort: '',
-    context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT,
-    concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT,
-    temperature_enabled: false,
-    temperature: DEFAULT_TEXT_TEMPERATURE,
-    request_mode: 'stream',
-  },
   deepseek: {
     api_key: '',
     base_url: textProviderBaseUrls.deepseek,
-    model_name: '',
-    reasoning_effort: '',
-    context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT,
-    concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT,
-    temperature_enabled: false,
-    temperature: DEFAULT_TEXT_TEMPERATURE,
-    request_mode: 'stream',
-  },
-  agnes: {
-    api_key: '',
-    base_url: textProviderBaseUrls.agnes,
-    model_name: '',
+    model_name: 'deepseek-chat',
     reasoning_effort: '',
     context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT,
     concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT,
@@ -93,63 +55,13 @@ const defaultTextModelProfiles = {
   },
 };
 
-const legacyTextModelProfiles = {
-  longcat: {
-    api_key: '',
-    base_url: 'https://api.longcat.chat/openai/v1',
-    model_name: '',
-    reasoning_effort: '',
-    context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT,
-    concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT,
-    temperature_enabled: false,
-    temperature: DEFAULT_TEXT_TEMPERATURE,
-    request_mode: 'stream',
-  },
-};
-
 const defaultImageModelProfiles = {
-  jinlong: {
-    provider: 'jinlong',
-    base_url: 'https://img-api.jlaudeapi.com/v1',
-    api_key: '',
-    model_name: 'gpt-image-2',
-    image_size: '1024x1024',
-    request_mode: 'normal',
-    concurrency_limit: DEFAULT_IMAGE_CONCURRENCY_LIMIT,
-    status: 'untested',
-    tested_at: '',
-    last_error: '',
-  },
-  volcengine: {
-    provider: 'volcengine',
-    base_url: 'https://ark.cn-beijing.volces.com/api/v3',
-    api_key: '',
-    model_name: '',
-    image_size: '1024x1024',
-    request_mode: 'stream',
-    concurrency_limit: DEFAULT_IMAGE_CONCURRENCY_LIMIT,
-    status: 'untested',
-    tested_at: '',
-    last_error: '',
-  },
   'google-ai-studio': {
     provider: 'google-ai-studio',
     base_url: 'https://generativelanguage.googleapis.com/v1beta',
     api_key: '',
     model_name: 'gemini-3.1-flash-image-preview',
     image_size: '1K',
-    request_mode: 'stream',
-    concurrency_limit: DEFAULT_IMAGE_CONCURRENCY_LIMIT,
-    status: 'untested',
-    tested_at: '',
-    last_error: '',
-  },
-  agnes: {
-    provider: 'agnes',
-    base_url: 'https://apihub.agnes-ai.com/v1',
-    api_key: '',
-    model_name: '',
-    image_size: '1024x1024',
     request_mode: 'stream',
     concurrency_limit: DEFAULT_IMAGE_CONCURRENCY_LIMIT,
     status: 'untested',
@@ -246,11 +158,11 @@ const defaultExportFormat = {
 };
 
 const defaultConfig = {
-  text_model_provider: 'jinlong',
+  text_model_provider: 'deepseek',
   text_model_profiles: defaultTextModelProfiles,
   api_key: '',
-  base_url: textProviderBaseUrls.jinlong,
-  model_name: 'gpt-3.5-turbo',
+  base_url: textProviderBaseUrls.deepseek,
+  model_name: 'deepseek-chat',
   reasoning_effort: '',
   context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT,
   concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT,
@@ -258,7 +170,7 @@ const defaultConfig = {
   temperature: DEFAULT_TEXT_TEMPERATURE,
   request_mode: 'stream',
   image_model: {
-    ...defaultImageModelProfiles.jinlong,
+    ...defaultImageModelProfiles['google-ai-studio'],
   },
   image_model_profiles: defaultImageModelProfiles,
   components: {
@@ -269,7 +181,6 @@ const defaultConfig = {
     mermaid_concurrency_limit: DEFAULT_COMPONENT_CONCURRENCY_LIMIT,
     html_concurrency_limit: DEFAULT_COMPONENT_CONCURRENCY_LIMIT,
   },
-  update_channel: 'github',
   gpu_hardware_acceleration_enabled: true,
   gpu_hardware_acceleration_configured: true,
   export_format: defaultExportFormat,
@@ -300,20 +211,12 @@ function isTextModelProvider(value) {
   return textModelProviders.includes(value);
 }
 
-function isLegacyTextModelProvider(value) {
-  return legacyTextModelProviders.includes(value);
-}
-
 function isImageModelProvider(value) {
   return imageModelProviders.includes(value);
 }
 
 function normalizeAiRequestMode(value, fallback = 'stream') {
   return aiRequestModes.includes(value) ? value : fallback;
-}
-
-function normalizeUpdateChannel(value, fallback = defaultConfig.update_channel) {
-  return updateChannels.includes(value) ? value : fallback;
 }
 
 function normalizeTextContextLengthLimit(value, fallback = DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT) {
@@ -378,7 +281,7 @@ function normalizeComponentsConfig(source) {
 }
 
 function normalizeTextModelProfile(provider, profile) {
-  const defaults = defaultTextModelProfiles[provider] || legacyTextModelProfiles[provider];
+  const defaults = defaultTextModelProfiles[provider];
   const source = profile || {};
   const sourceBaseUrl = provider === 'custom'
     ? source.base_url !== undefined ? source.base_url : defaults.base_url
@@ -403,11 +306,6 @@ function normalizeTextModelProfiles(sourceProfiles) {
       provider,
       sourceProfiles && typeof sourceProfiles === 'object' ? sourceProfiles[provider] : null,
     );
-  });
-  legacyTextModelProviders.forEach((provider) => {
-    if (sourceProfiles && typeof sourceProfiles === 'object' && sourceProfiles[provider]) {
-      profiles[provider] = normalizeTextModelProfile(provider, sourceProfiles[provider]);
-    }
   });
   return profiles;
 }
@@ -485,20 +383,19 @@ function normalizeImageSize(provider, value, fallback) {
 function normalizeImageModelProfile(provider, profile) {
   const defaults = defaultImageModelProfiles[provider];
   const source = profile || {};
-  const useProviderDefaultImageModel = provider === 'jinlong' && !String(source.model_name ?? '').trim();
   return {
     provider,
     base_url: provider === 'custom'
       ? source.base_url !== undefined ? source.base_url : defaults.base_url
       : defaults.base_url,
     api_key: source.api_key !== undefined ? source.api_key : defaults.api_key,
-    model_name: useProviderDefaultImageModel ? defaults.model_name : source.model_name !== undefined ? source.model_name : defaults.model_name,
-    image_size: normalizeImageSize(provider, useProviderDefaultImageModel ? defaults.image_size : source.image_size, defaults.image_size),
-    request_mode: normalizeAiRequestMode(useProviderDefaultImageModel ? defaults.request_mode : source.request_mode, defaults.request_mode),
+    model_name: source.model_name !== undefined ? source.model_name : defaults.model_name,
+    image_size: normalizeImageSize(provider, source.image_size, defaults.image_size),
+    request_mode: normalizeAiRequestMode(source.request_mode, defaults.request_mode),
     concurrency_limit: normalizeImageConcurrencyLimit(source.concurrency_limit, defaults.concurrency_limit),
-    status: useProviderDefaultImageModel ? defaults.status : source.status !== undefined ? source.status : defaults.status,
-    tested_at: useProviderDefaultImageModel ? defaults.tested_at : source.tested_at !== undefined ? source.tested_at : defaults.tested_at,
-    last_error: useProviderDefaultImageModel ? defaults.last_error : source.last_error !== undefined ? source.last_error : defaults.last_error,
+    status: source.status !== undefined ? source.status : defaults.status,
+    tested_at: source.tested_at !== undefined ? source.tested_at : defaults.tested_at,
+    last_error: source.last_error !== undefined ? source.last_error : defaults.last_error,
   };
 }
 
@@ -679,22 +576,21 @@ function normalizeConfig(config) {
   const source = config || {};
   const hasTextProvider = Object.prototype.hasOwnProperty.call(source, 'text_model_provider');
   const rawTextProvider = typeof source.text_model_provider === 'string' ? source.text_model_provider : '';
-  const sourceTextProvider = isTextModelProvider(rawTextProvider) || isLegacyTextModelProvider(rawTextProvider)
-    ? rawTextProvider
-    : '';
+  const sourceTextProvider = isTextModelProvider(rawTextProvider) ? rawTextProvider : '';
   const textModelProvider = sourceTextProvider || (hasTextProvider || config ? 'custom' : defaultConfig.text_model_provider);
   const textModelProfiles = normalizeTextModelProfiles(source.text_model_profiles);
   if (sourceTextProvider) {
     const fallbackProfile = textModelProfiles[textModelProvider]
-      || defaultTextModelProfiles[textModelProvider]
-      || legacyTextModelProfiles[textModelProvider];
+      || defaultTextModelProfiles[textModelProvider];
     textModelProfiles[textModelProvider] = textProfileFromFlatConfig(source, fallbackProfile, textModelProvider);
   } else if (textModelProvider === 'custom' && !hasTextModelProfileData(textModelProfiles.custom)) {
     textModelProfiles.custom = textProfileFromUnknownProvider(source, rawTextProvider, textModelProfiles.custom);
   }
   const activeTextProfile = textModelProfiles[textModelProvider];
   const sourceImageModel = source.image_model && typeof source.image_model === 'object' ? source.image_model : {};
-  const imageModelProvider = isImageModelProvider(sourceImageModel.provider) ? sourceImageModel.provider : defaultConfig.image_model.provider;
+  const imageModelProvider = isImageModelProvider(sourceImageModel.provider)
+    ? sourceImageModel.provider
+    : sourceImageModel.provider ? 'custom' : defaultConfig.image_model.provider;
   const imageModelProfiles = normalizeImageModelProfiles(source.image_model_profiles);
   imageModelProfiles[imageModelProvider] = normalizeImageModelProfile(imageModelProvider, sourceImageModel);
   const activeImageProfile = imageModelProfiles[imageModelProvider];
@@ -723,7 +619,6 @@ function normalizeConfig(config) {
     image_model: activeImageProfile,
     image_model_profiles: imageModelProfiles,
     components: normalizeComponentsConfig(source.components),
-    update_channel: normalizeUpdateChannel(source.update_channel),
     gpu_hardware_acceleration_enabled: gpuHardwareAccelerationEnabled,
     gpu_hardware_acceleration_configured: gpuHardwareAccelerationConfigured === false ? true : gpuHardwareAccelerationConfigured,
     export_format: normalizeExportFormat(source.export_format),

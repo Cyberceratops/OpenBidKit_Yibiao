@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "agnet-analytics-api",
+  "name": "openbidkit-yibiao-analytics-api",
   "main": "src/index.js",
   "compatibility_date": "2026-05-14",
   "workers_dev": true,
@@ -9,16 +9,10 @@
     "head_sampling_rate": 1
   },
   "keep_vars": true,
-  "routes": [
-    {
-      "pattern": "analytics.agnet.top",
-      "custom_domain": true
-    }
-  ],
   "analytics_engine_datasets": [
     {
       "binding": "ANALYTICS",
-      "dataset": "agnet_analytics"
+      "dataset": "openbidkit_yibiao_analytics"
     }
   ],
   "triggers": {
@@ -27,8 +21,36 @@
       "30 17 * * *",
       "0 18 * * *",
       "30 18 * * *",
-      "0 19 * * *",
-      "0 20 * * *"
+      "0 19 * * *"
     ]
-  }
+  },
+  "kv_namespaces": [
+    {
+      "binding": "NOTICE_STORE",
+      "id": "3ead1f5bb1ac42feaedb05ed48318383"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "ANALYTICS_DB",
+      "database_name": "openbidkit-analytics",
+      "database_id": "ae75111c-136f-4349-a620-501a8c090261",
+      "migrations_dir": "analytics-migrations"
+    },
+    {
+      "binding": "RESOURCE_DB",
+      "database_name": "openbidkit-resources",
+      "database_id": "95e1f18d-e69e-4535-a1c7-439014ad02ab"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "AGENT_ERROR_BUCKET",
+      "bucket_name": "openbidkit-agent-errors"
+    },
+    {
+      "binding": "RESOURCE_BUCKET",
+      "bucket_name": "openbidkit"
+    }
+  ]
 }

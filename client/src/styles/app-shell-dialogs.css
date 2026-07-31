@@ -519,7 +519,7 @@
   gap: 10px;
 }
 
-/* [4789-4964] remote-notice-title/time/content/actions/preview-modal/card/close (UpdateNotifier.tsx) */
+/* Markdown notice content */
 .remote-notice-title {
   flex: 0 0 auto;
   margin: 0;
@@ -738,4 +738,3 @@
   border: 1px solid rgba(245, 158, 11, 0.32);
   border-radius: 14px;
 }
-

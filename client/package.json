@@ -11,12 +11,13 @@
     "build": "tsc --noEmit && vite build",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:mac": "npm run build && npm run prepare-agent-tools -- --platform darwin --arch arm64 && npm run verify-agent-tools -- --platform darwin --arch arm64 && electron-builder --mac dmg --arm64 && npm run verify-packaged-agent-tools -- --platform darwin --arch arm64 --release release/mac-arm64",
     "postinstall": "electron-builder install-app-deps",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "generate-build-attestation": "node scripts/generate-build-attestation.cjs",
-    "prepare-opencode-tools": "node scripts/prepare-opencode-tools.cjs",
-    "verify-opencode-tools": "node scripts/verify-opencode-tools.cjs",
+    "prepare-agent-tools": "node scripts/prepare-agent-tools.cjs",
+    "verify-agent-tools": "node scripts/verify-agent-tools.cjs",
+    "verify-packaged-agent-tools": "node scripts/verify-packaged-agent-tools.cjs",
     "smoke:electron-native": "electron scripts/electron-native-smoke.cjs",
     "start": "electron ."
   },
@@ -36,26 +37,11 @@
     ],
     "extraResources": [
       {
-        "from": "vendor/opencode",
-        "to": "opencode",
+        "from": "vendor/agent-tools",
+        "to": "agent-tools",
         "filter": [
           "**/*"
         ]
-      },
-      {
-        "from": "vendor/opencode-tools",
-        "to": "opencode-tools",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "FB208",
-        "repo": "OpenBidKit_Yibiao",
-        "releaseType": "release"
       }
     ],
     "win": {
@@ -94,14 +80,6 @@
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
             "arm64"
           ]
         }
@@ -149,7 +127,6 @@
     "chardet": "^2.1.1",
     "cheerio": "^1.2.0",
     "docx": "^9.6.1",
-    "electron-updater": "^6.8.3",
     "iconv-lite": "^0.7.2",
     "image-size": "^2.0.2",
     "mammoth": "^1.12.0",

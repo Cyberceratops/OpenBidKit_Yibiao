@@ -3,8 +3,9 @@ const path = require('path');
 const https = require('https');
 const AdmZip = require('adm-zip');
 const { createPluginContext } = require('./pluginContext.cjs');
+const { buildServiceUrl } = require('./serviceEndpoints.cjs');
 
-const PLUGIN_MARKET_URL = 'https://analytics.agnet.top/plugins';
+const PLUGIN_MARKET_URL = buildServiceUrl('/plugins');
 const PLUGIN_DOWNLOAD_URL = `${PLUGIN_MARKET_URL}/download`;
 const PLUGIN_STATE_FILE = 'plugin-states.json';
 

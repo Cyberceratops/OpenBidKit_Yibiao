@@ -148,7 +148,12 @@ function normalizeOutlineWordControlOptions(value) {
 }
 
 function isValidStep(value) {
-  return ['document-analysis', 'bid-analysis', 'outline-generation', 'global-facts', 'content-edit', 'expand'].includes(value);
+  return ['document-analysis', 'bid-analysis', 'outline-generation', 'global-facts', 'content-edit'].includes(value);
+}
+
+function normalizeStep(value) {
+  if (value === 'expand') return 'content-edit';
+  return isValidStep(value) ? value : 'document-analysis';
 }
 
 function normalizeGlobalFactId(value, index) {
@@ -1517,7 +1522,7 @@ function createTechnicalPlanStore({ app, db, fileService }) {
     return {
       ...initialState,
       workflowKind: normalizeWorkflowKind(meta.workflow_kind),
-      step: isValidStep(meta.step) ? meta.step : 'document-analysis',
+      step: normalizeStep(meta.step),
       tenderFile,
       tenderFiles,
       originalPlanFile,

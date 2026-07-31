@@ -22,37 +22,15 @@ const {
   writeAiLog,
 } = require('../utils/aiLog.cjs');
 const textTokenStatsStore = require('./textTokenStatsStore.cjs');
+const { buildServiceUrl } = require('./serviceEndpoints.cjs');
 
 const AI_REQUEST_TIMEOUT_MS = 600000;
 
-// 金龙中转站废弃模型映射：使用这些模型时自动切换到替代模型
-const JINLONG_DEPRECATED_MODEL_MAP = {
-  'codex-auto-review': 'gpt-5.6-terra',
-  'gpt-5.6-luna': 'gpt-5.6-terra',
-};
 const IMAGE_MODEL_TEST_TIMEOUT_MESSAGE = '生图模型测试超时，请检查 Base URL、API Key 或模型名称';
-const ANALYTICS_ENDPOINT = 'https://analytics.agnet.top/track';
+const ANALYTICS_ENDPOINT = buildServiceUrl('/track');
 const ANALYTICS_PROJECT_NAME = 'yibiao-client';
-const MODEL_INFO_ENDPOINT = 'https://analytics.agnet.top/model-info';
+const MODEL_INFO_ENDPOINT = buildServiceUrl('/model-info');
 const OPENAI_IMAGE_PROVIDER_META = {
-  jinlong: {
-    label: '金龙中转站',
-    defaultBaseUrl: 'https://img-api.jlaudeapi.com/v1',
-    logProvider: 'jinlong',
-    modelLabel: '生图模型名称',
-  },
-  volcengine: {
-    label: '火山方舟',
-    defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-    logProvider: 'volcengine',
-    modelLabel: '模型名称或推理接入点 ID',
-  },
-  agnes: {
-    label: 'Agnes AI',
-    defaultBaseUrl: 'https://apihub.agnes-ai.com/v1',
-    logProvider: 'agnes',
-    modelLabel: '生图模型名称',
-  },
   custom: {
     label: '自定义生图服务',
     defaultBaseUrl: '',
@@ -301,6 +279,27 @@ function trackAiRequest(app, config, payload) {
       });
     })
     .catch(() => undefined);
+}
+
+function trackWorkflowStage(app, config, stage, status, durationMs) {
+  const normalizedDurationMs = Math.max(0, Math.min(24 * 60 * 60 * 1000, Math.floor(Number(durationMs || 0))));
+  if (!normalizedDurationMs) return;
+  void fetch(ANALYTICS_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      projectName: ANALYTICS_PROJECT_NAME,
+      event: 'workflow_stage_runtime',
+      version: typeof app?.getVersion === 'function' ? app.getVersion() : '',
+      platform: process.platform,
+      arch: process.arch,
+      client_id: config.analytics_client_id || '',
+      client_created_at: config.analytics_created_at || '',
+      workflow_stage: String(stage || ''),
+      workflow_status: status === 'success' ? 'success' : 'failed',
+      workflow_duration_ms: normalizedDurationMs,
+    }),
+  }).catch(() => undefined);
 }
 
 function imageExtensionFromMime(mimeType) {
@@ -782,7 +781,7 @@ async function collectJsonResponseWithConfig(app, config, request) {
 }
 
 function createChatRequestBody(config, request, options = {}) {
-  const modelName = JINLONG_DEPRECATED_MODEL_MAP[config.model_name] || config.model_name;
+  const modelName = config.model_name;
   const body = {
     model: modelName,
     messages: request.messages,
@@ -1326,7 +1325,7 @@ async function chatWithConfig(app, config, request) {
 
 async function testOpenAICompatibleImageModel(app, config, provider) {
   const imageConfig = config.image_model || {};
-  const meta = OPENAI_IMAGE_PROVIDER_META[provider] || OPENAI_IMAGE_PROVIDER_META.volcengine;
+  const meta = OPENAI_IMAGE_PROVIDER_META[provider] || OPENAI_IMAGE_PROVIDER_META.custom;
   let responseData = null;
   let analyticsTracked = false;
 
@@ -1537,7 +1536,7 @@ async function testGoogleImageModel(app, config) {
 
 async function generateOpenAICompatibleImage(app, config, request, provider) {
   const imageConfig = config.image_model || {};
-  const meta = OPENAI_IMAGE_PROVIDER_META[provider] || OPENAI_IMAGE_PROVIDER_META.volcengine;
+  const meta = OPENAI_IMAGE_PROVIDER_META[provider] || OPENAI_IMAGE_PROVIDER_META.custom;
   const requestId = createRequestId();
   const logTitle = resolveAiLogTitle(request, request.title ? `AI生图-${request.title}` : 'AI生图');
   const requestMode = normalizeImageRequestMode(imageConfig);
@@ -1705,7 +1704,7 @@ async function generateImageWithConfig(app, config, request) {
     throw new Error(availability.message);
   }
 
-  if (config.image_model?.provider === 'jinlong' || config.image_model?.provider === 'volcengine' || config.image_model?.provider === 'agnes' || config.image_model?.provider === 'custom') {
+  if (config.image_model?.provider === 'custom') {
     return generateOpenAICompatibleImage(app, config, request, config.image_model.provider);
   }
 
@@ -1757,6 +1756,10 @@ function createAiService({ app, configStore }) {
   const service = {
     getConfig() {
       return configStore.load();
+    },
+
+    trackWorkflowStage(stage, status, durationMs) {
+      trackWorkflowStage(app, configStore.load(), stage, status, durationMs);
     },
 
     async chat(request) {
@@ -1845,7 +1848,7 @@ function createAiService({ app, configStore }) {
         analytics_created_at: config.analytics_created_at || currentConfig.analytics_created_at,
       };
 
-      if (trackedConfig.image_model?.provider === 'jinlong' || trackedConfig.image_model?.provider === 'volcengine' || trackedConfig.image_model?.provider === 'agnes' || trackedConfig.image_model?.provider === 'custom') {
+      if (trackedConfig.image_model?.provider === 'custom') {
         return testOpenAICompatibleImageModel(app, trackedConfig, trackedConfig.image_model.provider);
       }
 
@@ -1921,7 +1924,7 @@ function createAiService({ app, configStore }) {
         success: true,
         message: '模型列表已更新',
         models: Array.isArray(data.data) 
-          ? data.data.map((item) => item.id).filter(Boolean).filter(id => !Object.keys(JINLONG_DEPRECATED_MODEL_MAP).includes(id))
+          ? data.data.map((item) => item.id).filter(Boolean)
           : [],
       };
     },

@@ -1,13 +1,11 @@
 ﻿import { useEffect, useState } from 'react';
 import { trackConfigUsage } from '../../../shared/analytics/analytics';
-import { DetailHelpLink, FloatingToolbar, InputWithAction, OfflineLicenseActivationDialog, useToast } from '../../../shared/ui';
-import { showUpdateReadyToast } from '../../../shared/updateToast';
+import { DetailHelpLink, FloatingToolbar, InputWithAction, useToast } from '../../../shared/ui';
 import type { FloatingToolbarGroup } from '../../../shared/ui';
-import type { AgentModeScenariosConfig, AgentRuntimeDescriptor, AgentSelfCheckResult, AgentSelfCheckStepStatus, AiRequestMode, ClientConfig, ComponentsConfig, ConfiguredTextModelProvider, FileParserProvider, ImageModelConfig, ImageModelProfiles, ImageModelProvider, ImageModelSize, ImageModelStatus, LicenseRuntimeStatus, TextModelConfig, TextModelProfiles, TextModelProvider, UpdateChannel } from '../../../shared/types';
+import type { AgentModeScenariosConfig, AgentRuntimeDescriptor, AgentSelfCheckResult, AgentSelfCheckStepStatus, AiRequestMode, ClientConfig, ComponentsConfig, ConfiguredTextModelProvider, FileParserProvider, ImageModelConfig, ImageModelProfiles, ImageModelProvider, ImageModelSize, ImageModelStatus, TextModelConfig, TextModelProfiles, TextModelProvider } from '../../../shared/types';
 import type { SettingsPageState } from '../types';
 
 type SettingsTab = 'general' | 'text-model' | 'image-model' | 'components' | 'agent' | 'about';
-type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'downloaded' | 'error' | 'disabled';
 type AgentSelfCheckUiStatus = 'untested' | 'checking' | 'normal' | 'busy' | 'error';
 
 const settingsTabs: Array<{ id: SettingsTab; label: string }> = [
@@ -36,18 +34,9 @@ const agentDiagnosticStatusMeta: Record<AgentSelfCheckStepStatus, { label: strin
   skipped: { label: '已跳过', description: '因前置条件不足或无需执行而跳过。' },
 };
 
-const updateChannelOptions: Array<{ value: UpdateChannel; label: string; description: string }> = [
-  { value: 'github', label: 'GitHub', description: '使用 GitHub Release 检查和下载更新' },
-  { value: 'cloudflare', label: 'Cloudflare', description: '使用 Cloudflare R2 镜像检查和下载更新' },
-];
-
 const defaultAgentModeScenarios: AgentModeScenariosConfig = {
   existing_plan_expansion_original_outline_extraction: true,
 };
-
-function normalizeUpdateChannel(value?: string): UpdateChannel {
-  return value === 'cloudflare' ? 'cloudflare' : 'github';
-}
 
 function normalizeAgentModeScenarios(value?: Partial<AgentModeScenariosConfig>): AgentModeScenariosConfig {
   return {
@@ -57,16 +46,8 @@ function normalizeAgentModeScenarios(value?: Partial<AgentModeScenariosConfig>):
   };
 }
 
-function getLicenseSourceLabel(status: LicenseRuntimeStatus | null) {
-  if (!status) return '读取中';
-  return status.sourceTrusted ? '官方发行版' : '不可信的客户端来源';
-}
-
 const textModelProviders: Array<{ value: TextModelProvider; label: string }> = [
-  { value: 'jinlong', label: '金龙中转站【推荐】' },
-  { value: 'volcengine', label: '火山方舟' },
   { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'agnes', label: 'Agnes AI' },
   { value: 'custom', label: '自定义' },
 ];
 
@@ -80,19 +61,12 @@ const DEFAULT_TEXT_CONCURRENCY_LIMIT = 10;
 const DEFAULT_TEXT_TEMPERATURE = 0.7;
 
 const textProviderDefaults: Record<ConfiguredTextModelProvider, TextModelConfig> = {
-  jinlong: { api_key: '', base_url: 'https://jlaudeapi.com/v1', model_name: 'gpt-3.5-turbo', reasoning_effort: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, temperature_enabled: false, temperature: DEFAULT_TEXT_TEMPERATURE, request_mode: 'stream' },
-  volcengine: { api_key: '', base_url: 'https://ark.cn-beijing.volces.com/api/v3', model_name: '', reasoning_effort: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, temperature_enabled: false, temperature: DEFAULT_TEXT_TEMPERATURE, request_mode: 'stream' },
-  deepseek: { api_key: '', base_url: 'https://api.deepseek.com', model_name: '', reasoning_effort: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, temperature_enabled: false, temperature: DEFAULT_TEXT_TEMPERATURE, request_mode: 'stream' },
-  longcat: { api_key: '', base_url: 'https://api.longcat.chat/openai/v1', model_name: '', reasoning_effort: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, temperature_enabled: false, temperature: DEFAULT_TEXT_TEMPERATURE, request_mode: 'stream' },
-  agnes: { api_key: '', base_url: 'https://apihub.agnes-ai.com/v1', model_name: '', reasoning_effort: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, temperature_enabled: false, temperature: DEFAULT_TEXT_TEMPERATURE, request_mode: 'stream' },
+  deepseek: { api_key: '', base_url: 'https://api.deepseek.com', model_name: 'deepseek-chat', reasoning_effort: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, temperature_enabled: false, temperature: DEFAULT_TEXT_TEMPERATURE, request_mode: 'stream' },
   custom: { api_key: '', base_url: '', model_name: '', reasoning_effort: '', context_length_limit: DEFAULT_TEXT_CONTEXT_LENGTH_LIMIT, concurrency_limit: DEFAULT_TEXT_CONCURRENCY_LIMIT, temperature_enabled: false, temperature: DEFAULT_TEXT_TEMPERATURE, request_mode: 'stream' },
 };
 
 const textProviderApiKeyUrls: Partial<Record<ConfiguredTextModelProvider, string>> = {
-  jinlong: 'https://s.markup.com.cn/jl',
-  volcengine: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
   deepseek: 'https://platform.deepseek.com/api_keys',
-  agnes: 'https://platform.agnes-ai.com/settings/apiKeys',
 };
 
 function createDefaultTextModelProfiles(): TextModelProfiles {
@@ -165,10 +139,6 @@ function normalizeTextModelProfiles(
     [provider.value]: normalizeTextModelProfile(provider.value, profiles?.[provider.value]),
   }), {} as TextModelProfiles);
 
-  if (activeProvider === 'longcat' || profiles?.longcat) {
-    nextProfiles.longcat = normalizeTextModelProfile('longcat', profiles?.longcat);
-  }
-
   return nextProfiles;
 }
 
@@ -187,10 +157,7 @@ function textProfileFromState(textModel: SettingsPageState['textModel']): TextMo
 }
 
 const imageProviders: Array<{ value: ImageModelProvider; label: string }> = [
-  { value: 'jinlong', label: '金龙中转站【推荐】' },
-  { value: 'volcengine', label: '火山方舟' },
   { value: 'google-ai-studio', label: 'Google AI Studio' },
-  { value: 'agnes', label: 'Agnes AI' },
   { value: 'custom', label: '自定义 OpenAI-like' },
 ];
 
@@ -227,48 +194,12 @@ function normalizeImageSize(provider: ImageModelProvider, value?: string): Image
 }
 
 const imageProviderDefaults: ImageModelProfiles = {
-  jinlong: {
-    provider: 'jinlong',
-    base_url: 'https://img-api.jlaudeapi.com/v1',
-    api_key: '',
-    model_name: 'gpt-image-2',
-    image_size: '1024x1024',
-    request_mode: 'normal',
-    concurrency_limit: DEFAULT_IMAGE_CONCURRENCY_LIMIT,
-    status: 'untested',
-    tested_at: '',
-    last_error: '',
-  },
-  volcengine: {
-    provider: 'volcengine',
-    base_url: 'https://ark.cn-beijing.volces.com/api/v3',
-    api_key: '',
-    model_name: '',
-    image_size: '1024x1024',
-    request_mode: 'stream',
-    concurrency_limit: DEFAULT_IMAGE_CONCURRENCY_LIMIT,
-    status: 'untested',
-    tested_at: '',
-    last_error: '',
-  },
   'google-ai-studio': {
     provider: 'google-ai-studio',
     base_url: 'https://generativelanguage.googleapis.com/v1beta',
     api_key: '',
     model_name: 'gemini-3.1-flash-image-preview',
     image_size: '1K',
-    request_mode: 'stream',
-    concurrency_limit: DEFAULT_IMAGE_CONCURRENCY_LIMIT,
-    status: 'untested',
-    tested_at: '',
-    last_error: '',
-  },
-  agnes: {
-    provider: 'agnes',
-    base_url: 'https://apihub.agnes-ai.com/v1',
-    api_key: '',
-    model_name: '',
-    image_size: '1024x1024',
     request_mode: 'stream',
     concurrency_limit: DEFAULT_IMAGE_CONCURRENCY_LIMIT,
     status: 'untested',
@@ -290,49 +221,31 @@ const imageProviderDefaults: ImageModelProfiles = {
 };
 
 const imageProviderApiKeyUrls: Record<ImageModelProvider, string> = {
-  jinlong: 'https://s.markup.com.cn/jl',
-  volcengine: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
   'google-ai-studio': 'https://aistudio.google.com/api-keys',
-  agnes: 'https://platform.agnes-ai.com/settings/apiKeys',
   custom: '',
 };
 
 const imageProviderLabels: Record<ImageModelProvider, string> = {
-  jinlong: '金龙中转站',
-  volcengine: '火山方舟',
   'google-ai-studio': 'Google AI Studio',
-  agnes: 'Agnes AI',
   custom: '自定义生图服务',
 };
 
 function getImageBaseUrlDescription(provider: ImageModelProvider) {
-  if (provider === 'jinlong') return '金龙中转站 OpenAI 兼容接口地址';
-  if (provider === 'volcengine') return '火山方舟 OpenAI 兼容接口地址';
-  if (provider === 'agnes') return 'Agnes AI OpenAI 兼容接口地址';
   if (provider === 'custom') return '填写兼容 OpenAI /images/generations 的接口地址';
   return 'Google Gemini API REST 地址';
 }
 
 function getImageApiKeyDescription(provider: ImageModelProvider) {
-  if (provider === 'jinlong') return '用于调用金龙中转站图片生成 API';
-  if (provider === 'volcengine') return '用于调用火山方舟图片生成 API';
-  if (provider === 'agnes') return '用于调用 Agnes AI 图片生成 API';
   if (provider === 'custom') return '用于调用自定义 OpenAI-like 生图接口';
   return '用于调用 Google AI Studio Gemini API';
 }
 
 function getImageModelDescription(provider: ImageModelProvider) {
-  if (provider === 'jinlong') return '填写金龙中转站已开通的生图模型名称';
-  if (provider === 'volcengine') return '填写火山方舟控制台中已开通的模型或推理接入点 ID';
-  if (provider === 'agnes') return '填写 Agnes AI 已开通的生图模型名称';
   if (provider === 'custom') return '填写自定义接口支持的生图模型名称';
   return '选择或填写支持图片生成的 Gemini 模型';
 }
 
 function getImageModelPlaceholder(provider: ImageModelProvider) {
-  if (provider === 'jinlong') return '请输入已开通的生图模型名称';
-  if (provider === 'volcengine') return '请输入已开通的模型或推理接入点 ID';
-  if (provider === 'agnes') return '请输入 Agnes AI 生图模型名称';
   if (provider === 'custom') return '请输入 OpenAI-like 生图模型名称';
   return 'gemini-3.1-flash-image-preview';
 }
@@ -346,18 +259,17 @@ function createDefaultImageModelProfiles(): ImageModelProfiles {
 
 function normalizeImageModelProfile(provider: ImageModelProvider, profile?: Partial<ImageModelConfig>): ImageModelConfig {
   const defaults = imageProviderDefaults[provider];
-  const useProviderDefaultImageModel = provider === 'jinlong' && !String(profile?.model_name ?? '').trim();
   return {
     provider,
     base_url: provider === 'custom' ? profile?.base_url ?? defaults.base_url : defaults.base_url,
     api_key: profile?.api_key ?? defaults.api_key,
-    model_name: useProviderDefaultImageModel ? defaults.model_name : profile?.model_name ?? defaults.model_name,
-    image_size: normalizeImageSize(provider, useProviderDefaultImageModel ? defaults.image_size : profile?.image_size ?? defaults.image_size),
-    request_mode: normalizeAiRequestMode(useProviderDefaultImageModel ? defaults.request_mode : profile?.request_mode ?? defaults.request_mode),
+    model_name: profile?.model_name ?? defaults.model_name,
+    image_size: normalizeImageSize(provider, profile?.image_size ?? defaults.image_size),
+    request_mode: normalizeAiRequestMode(profile?.request_mode ?? defaults.request_mode),
     concurrency_limit: normalizeImageConcurrencyLimit(profile?.concurrency_limit ?? defaults.concurrency_limit),
-    status: useProviderDefaultImageModel ? defaults.status : profile?.status ?? defaults.status,
-    tested_at: useProviderDefaultImageModel ? defaults.tested_at : profile?.tested_at ?? defaults.tested_at,
-    last_error: useProviderDefaultImageModel ? defaults.last_error : profile?.last_error ?? defaults.last_error,
+    status: profile?.status ?? defaults.status,
+    tested_at: profile?.tested_at ?? defaults.tested_at,
+    last_error: profile?.last_error ?? defaults.last_error,
   };
 }
 
@@ -527,12 +439,12 @@ const parserOptions = [
 
 const initialState: SettingsPageState = {
   textModel: {
-    provider: 'jinlong',
-    ...textProviderDefaults.jinlong,
+    provider: 'deepseek',
+    ...textProviderDefaults.deepseek,
   },
   textModelProfiles: createDefaultTextModelProfiles(),
   imageModel: {
-    ...imageProviderDefaults.jinlong,
+    ...imageProviderDefaults['google-ai-studio'],
   },
   imageModelProfiles: createDefaultImageModelProfiles(),
   components: {
@@ -548,7 +460,6 @@ const initialState: SettingsPageState = {
   general: {
     developer_mode: false,
     developer_token_stats_auto_open: false,
-    update_channel: 'github',
     gpu_hardware_acceleration_enabled: true,
     gpu_hardware_acceleration_configured: true,
   },
@@ -573,12 +484,6 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
   const textModelBusy = loadingModels === 'text' || loadingReasoningEfforts || loadingContextLength || testingTextModel;
   const [imageTestPreview, setImageTestPreview] = useState<{ src: string; title: string } | null>(null);
   const [appVersion, setAppVersion] = useState('');
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
-  const [updatePercent, setUpdatePercent] = useState(0);
-  const [updateVersion, setUpdateVersion] = useState('');
-  const [updateError, setUpdateError] = useState('');
-  const [licenseStatus, setLicenseStatus] = useState<LicenseRuntimeStatus | null>(null);
-  const [offlineLicenseDialogOpen, setOfflineLicenseDialogOpen] = useState(false);
   const [agentRuntimes, setAgentRuntimes] = useState<AgentRuntimeDescriptor[]>([]);
   const [agentSelfCheckStatus, setAgentSelfCheckStatus] = useState<AgentSelfCheckUiStatus>('untested');
   const [agentSelfCheckResult, setAgentSelfCheckResult] = useState<AgentSelfCheckResult | null>(null);
@@ -591,31 +496,6 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
       .then((runtimes) => setAgentRuntimes(runtimes || []))
       .catch(() => setAgentRuntimes([]));
     void window.yibiao?.getVersion().then(setAppVersion);
-    void window.yibiao?.license?.getStatus().then(setLicenseStatus).catch(() => setLicenseStatus(null));
-
-    const unsubs: Array<() => void> = [];
-    unsubs.push(
-      window.yibiao?.onUpdateProgress(({ percent }) => {
-        setUpdateStatus('downloading');
-        setUpdatePercent(Math.round(percent));
-      }) ?? (() => {})
-    );
-    unsubs.push(
-      window.yibiao?.onUpdateDownloaded(({ version }) => {
-        if (version) {
-          setUpdateVersion(version);
-        }
-        setUpdateStatus('downloaded');
-      }) ?? (() => {})
-    );
-    unsubs.push(
-      window.yibiao?.onUpdateError(({ message }) => {
-        setUpdateStatus('error');
-        setUpdateError(message);
-      }) ?? (() => {})
-    );
-
-    return () => { unsubs.forEach((unsub) => unsub()); };
   }, []);
 
   const loadTextConfig = async () => {
@@ -646,7 +526,6 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
         general: {
           developer_mode: Boolean(config.developer_mode),
           developer_token_stats_auto_open: Boolean(config.developer_token_stats_auto_open),
-          update_channel: normalizeUpdateChannel(config.update_channel),
           gpu_hardware_acceleration_enabled: Boolean(config.gpu_hardware_acceleration_enabled),
           gpu_hardware_acceleration_configured: Boolean(config.gpu_hardware_acceleration_configured),
         },
@@ -700,70 +579,11 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
       components: componentsFromState(state.components),
       agent_runtime: options.includeAgentState ? state.agentRuntime : persistedAgentRuntime,
       agent_mode_scenarios: options.includeAgentState ? state.agentModeScenarios : persistedAgentModeScenarios,
-      update_channel: state.general.update_channel,
       gpu_hardware_acceleration_enabled: state.general.gpu_hardware_acceleration_enabled,
       gpu_hardware_acceleration_configured: state.general.gpu_hardware_acceleration_configured,
       developer_mode: state.general.developer_mode,
       developer_token_stats_auto_open: state.general.developer_token_stats_auto_open,
     };
-  };
-
-  const checkForUpdates = async () => {
-    if (updateStatus === 'checking' || updateStatus === 'downloading') {
-      return;
-    }
-
-    try {
-      setUpdateStatus('checking');
-      setUpdatePercent(0);
-      setUpdateError('');
-      const result = await window.yibiao?.checkUpdate();
-      if (!result?.enabled) {
-        setUpdateStatus('disabled');
-        showToast('开发调试模式不执行自动更新', 'info');
-        return;
-      }
-      if (result.failed) {
-        const message = result.message || '检查更新失败';
-        setUpdateStatus('error');
-        setUpdateError(message);
-        showToast(message, 'error');
-        return;
-      }
-      if (!result.updateAvailable) {
-        setUpdateStatus('idle');
-        showToast('已是最新版本', 'success');
-        return;
-      }
-
-      const version = result.version || updateVersion;
-      setUpdateVersion(version);
-      if (result.downloaded) {
-        setUpdateStatus('downloaded');
-        showUpdateReadyToast(showToast, version);
-        return;
-      }
-
-      setUpdateStatus('idle');
-      showToast('发现新版本，但更新包尚未下载完成，请稍后重试', 'info');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '检查更新失败';
-      setUpdateStatus('error');
-      setUpdateError(message);
-      showToast(message, 'error');
-    }
-  };
-
-  const installDownloadedUpdate = async () => {
-    try {
-      const result = await window.yibiao?.quitAndInstall();
-      if (result && !result.success) {
-        showToast(result.message || '安装更新失败', 'error');
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '安装更新失败';
-      showToast(message, 'error');
-    }
   };
 
   const updateImageModelConfig = (partial: Partial<Omit<SettingsPageState['imageModel'], 'provider'>>, options: { clearModels?: boolean } = {}) => {
@@ -832,13 +652,6 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
     setState((prev) => ({
       ...prev,
       general: { ...prev.general, developer_token_stats_auto_open: autoOpen },
-    }));
-  };
-
-  const updateUpdateChannel = (updateChannel: UpdateChannel) => {
-    setState((prev) => ({
-      ...prev,
-      general: { ...prev.general, update_channel: updateChannel },
     }));
   };
 
@@ -1245,11 +1058,9 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
   const fetchImageModels = async () => {
     try {
       setLoadingModels('image');
-      if (state.imageModel.provider === 'jinlong' || state.imageModel.provider === 'volcengine' || state.imageModel.provider === 'agnes' || state.imageModel.provider === 'custom') {
+      if (state.imageModel.provider === 'custom') {
         const providerLabel = imageProviderLabels[state.imageModel.provider];
-        const baseUrl = state.imageModel.provider === 'custom'
-          ? state.imageModel.base_url || ''
-          : state.imageModel.base_url || imageProviderDefaults[state.imageModel.provider].base_url || '';
+        const baseUrl = state.imageModel.base_url || '';
 
         if (!state.imageModel.api_key.trim()) {
           setImageModels([]);
@@ -1345,13 +1156,11 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
       return JSON.stringify({
         developer_mode: Boolean(state.general.developer_mode),
         developer_token_stats_auto_open: Boolean(state.general.developer_token_stats_auto_open),
-        update_channel: state.general.update_channel,
         gpu_hardware_acceleration_enabled: Boolean(state.general.gpu_hardware_acceleration_enabled),
         gpu_hardware_acceleration_configured: Boolean(state.general.gpu_hardware_acceleration_configured),
       }) !== JSON.stringify({
         developer_mode: Boolean(savedConfig.developer_mode),
         developer_token_stats_auto_open: Boolean(savedConfig.developer_token_stats_auto_open),
-        update_channel: normalizeUpdateChannel(savedConfig.update_channel),
         gpu_hardware_acceleration_enabled: Boolean(savedConfig.gpu_hardware_acceleration_enabled),
         gpu_hardware_acceleration_configured: Boolean(savedConfig.gpu_hardware_acceleration_configured),
       });
@@ -1499,17 +1308,6 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
       ]
     : [];
 
-  const updateBusy = updateStatus === 'checking' || updateStatus === 'downloading';
-  const updateStatusText = (() => {
-    if (updateStatus === 'checking') return '正在检查更新...';
-    if (updateStatus === 'downloading') return `正在下载 ${updatePercent}%`;
-    if (updateStatus === 'downloaded') return updateVersion ? `新版本 ${updateVersion} 已准备好` : '更新已准备好';
-    if (updateStatus === 'error') return `更新失败：${updateError || '未知错误'}`;
-    if (updateStatus === 'disabled') return '开发调试模式不执行自动更新';
-    return '启动后自动检查，每 30 分钟轮询';
-  })();
-  const licenseSourceLabel = getLicenseSourceLabel(licenseStatus);
-
   return (
     <div className="settings-page">
       <div className="settings-page-scroll">
@@ -1530,53 +1328,8 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
 
       {activeTab === 'general' && (
         <section className="settings-page-section">
-          <div className="settings-group-title">外观</div>
+          <div className="settings-group-title">系统</div>
           <div className="settings-list">
-            <div className="settings-row">
-              <div className="settings-row-copy">
-                <strong>显示语言</strong>
-                <span>选择界面的显示语言</span>
-              </div>
-              <select value="zh-CN" disabled>
-                <option value="zh-CN">简体中文</option>
-              </select>
-            </div>
-            <div className="settings-row">
-              <div className="settings-row-copy">
-                <strong>应用主题</strong>
-                <span>切换深色或浅色模式</span>
-              </div>
-              <select value="system" disabled>
-                <option value="system">跟随系统</option>
-              </select>
-            </div>
-            <div className="settings-row">
-              <div className="settings-row-copy">
-                <strong>侧边栏布局</strong>
-                <span>保持当前经典布局，后续可扩展为紧凑布局</span>
-              </div>
-              <select value="classic" disabled>
-                <option value="classic">经典布局</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="settings-group-title">更新与系统</div>
-          <div className="settings-list">
-            <label className="settings-row">
-              <div className="settings-row-copy">
-                <strong>自动更新渠道</strong>
-                <span>{updateChannelOptions.find((option) => option.value === state.general.update_channel)?.description || '选择自动检查更新和下载客户端安装包的来源'}</span>
-              </div>
-              <select
-                value={state.general.update_channel}
-                onChange={(event) => updateUpdateChannel(event.target.value as UpdateChannel)}
-              >
-                {updateChannelOptions.map((option) => (
-                  <option value={option.value} key={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
             <label className="settings-row">
               <div className="settings-row-copy">
                 <strong>GPU 硬件加速</strong>
@@ -1672,9 +1425,6 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
                 value={state.textModel.provider}
                 onChange={(event) => updateTextModelProvider(event.target.value as TextModelProvider)}
               >
-                {state.textModel.provider === 'longcat' && (
-                  <option value="longcat" disabled>龙猫（历史配置）</option>
-                )}
                 {textModelProviders.map((provider) => (
                   <option value={provider.value} key={provider.value}>{provider.label}</option>
                 ))}
@@ -2305,60 +2055,26 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
           <div className="about-overview">
             <article className="about-update-card">
               <div className="about-card-head">
-                <span>自动更新</span>
+                <span>本地版本</span>
                 <strong>当前版本 {appVersion || '...'}</strong>
               </div>
-              <p>{updateStatusText}</p>
-              <button
-                type="button"
-                className="update-button"
-                disabled={updateBusy}
-                onClick={() => {
-                  if (updateStatus === 'downloaded') {
-                    void installDownloadedUpdate();
-                    return;
-                  }
-                  void checkForUpdates();
-                }}
-              >
-                {updateStatus === 'downloaded' ? '安装并重启' : updateBusy ? '检查中...' : '检查更新'}
-              </button>
+              <p>应用不会自动检查、下载或安装更新。</p>
             </article>
             <article className="about-info-card about-links-card">
-              <span>信息与授权</span>
+              <span>项目信息</span>
               <ul className="about-links-list">
                 <li className="about-links-item">
                   <span className="about-links-label">GitHub 仓库</span>
                   <a
                     className="about-links-value is-link"
-                    href="https://github.com/FB208/OpenBidKit_Yibiao"
+                    href="https://github.com/Cyberceratops/OpenBidKit_Yibiao"
                     target="_blank"
                     rel="noreferrer"
                   >
-                    FB208/OpenBidKit_Yibiao
+                    Cyberceratops/OpenBidKit_Yibiao
                   </a>
-                </li>
-                <li className="about-links-item">
-                  <span className="about-links-label">使用文档</span>
-                  <a
-                    className="about-links-value is-link"
-                    href="https://wiki.agnet.top/"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    wiki.agnet.top
-                  </a>
-                </li>
-                <li className="about-links-item">
-                  <span className="about-links-label">客户端授权状态</span>
-                  <span className={`about-links-value ${licenseStatus?.sourceTrusted ? 'is-trusted' : 'is-untrusted'}`}>
-                    {licenseSourceLabel}
-                  </span>
                 </li>
               </ul>
-              <button type="button" className="about-links-activate" onClick={() => setOfflineLicenseDialogOpen(true)}>
-                离线激活授权
-              </button>
             </article>
           </div>
           <div className="privacy-statement">
@@ -2388,11 +2104,6 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
         </section>
       )}
       </div>
-      <OfflineLicenseActivationDialog
-        open={offlineLicenseDialogOpen}
-        onOpenChange={setOfflineLicenseDialogOpen}
-        onActivated={setLicenseStatus}
-      />
       <FloatingToolbar groups={settingsToolbarGroups} label="设置保存工具条" />
     </div>
   );
