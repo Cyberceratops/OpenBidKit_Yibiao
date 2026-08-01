@@ -6527,7 +6527,6 @@ workspace 文件说明：
         await runTrackedWorkflowStage(
           'image-generation',
           () => runIllustrationGeneration(illustrationPlan),
-          (result) => result?.items?.some((item) => item.generation?.status === 'error') ? 'failed' : 'success',
         );
       } else {
         await runIllustrationGeneration(illustrationPlan);
