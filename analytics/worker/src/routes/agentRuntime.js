@@ -53,7 +53,7 @@ export async function handleAgentRuntimeExport(request, env, url) {
 
   try {
     const rows = await queryStatsAgentLatencyRuns(env, projectName, range);
-    const header = ['北京时间', '事件类型', '客户端版本', '平台', '架构', '客户端ID', '原始阶段', '统计阶段', '状态', '耗时毫秒', '耗时分钟', '采样间隔'];
+    const header = ['北京时间', '事件类型', '客户端版本', '平台', '架构', '客户端ID', '流程Run ID', '原始阶段', '统计阶段', '状态', '耗时毫秒', '耗时分钟', '采样间隔'];
     const csv = [
       header,
       ...rows.map((row) => [
@@ -63,6 +63,7 @@ export async function handleAgentRuntimeExport(request, env, url) {
         row.platform,
         row.arch,
         row.clientId,
+        row.runId,
         row.rawStage,
         row.stage,
         row.status,

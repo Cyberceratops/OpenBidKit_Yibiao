@@ -1051,30 +1051,70 @@ export async function queryStatsAgentLatencyRuns(env, projectName, range) {
   const latencyRange = range === 'history' ? '30' : range;
   const stageEventCondition = `(blob2 = 'workflow_stage_runtime' OR (blob2 = 'agent_runtime' AND blob19 NOT IN ('tender-analysis', 'fact-extraction', 'content-generation', 'image-generation')))`;
   const pipelineStageCondition = `blob19 IN ('tender-analysis', 'outline-extraction', 'outline-generation', 'outline-refinement', 'fact-extraction', 'content-generation', 'content-refinement', 'image-planning', 'image-generation')`;
-  const result = await queryAnalytics(env, `
-    SELECT
-      ${businessDateTimeSqlExpression()} AS occurredAt,
-      blob2 AS event,
-      blob4 AS version,
-      blob5 AS platform,
-      blob6 AS arch,
-      blob7 AS clientId,
-      blob19 AS rawStage,
-      if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
-      blob20 AS status,
-      double5 AS durationMs,
-      _sample_interval AS sampleInterval
-    FROM ${DATASET}
-    WHERE blob1 = ${project}
-      AND ${stageEventCondition}
-      AND ${pipelineStageCondition}
-      AND blob19 != ''
-      AND double5 > 0
-      AND ${aeRangeCondition(latencyRange)}
-    ORDER BY occurredAt DESC
-    LIMIT ${MAX_ANALYTICS_ROWS}
-  `);
-  return result.data || [];
+  const [result, runStartsResult] = await Promise.all([
+    queryAnalytics(env, `
+      SELECT
+        ${businessDateTimeSqlExpression()} AS occurredAt,
+        blob2 AS event,
+        blob4 AS version,
+        blob5 AS platform,
+        blob6 AS arch,
+        blob7 AS clientId,
+        blob19 AS rawStage,
+        if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
+        blob20 AS status,
+        double5 AS durationMs,
+        _sample_interval AS sampleInterval
+      FROM ${DATASET}
+      WHERE blob1 = ${project}
+        AND ${stageEventCondition}
+        AND ${pipelineStageCondition}
+        AND blob19 != ''
+        AND double5 > 0
+        AND ${aeRangeCondition(latencyRange)}
+      ORDER BY occurredAt DESC
+      LIMIT ${MAX_ANALYTICS_ROWS}
+    `),
+    queryAnalytics(env, `
+      SELECT
+        ${businessDateTimeSqlExpression()} AS occurredAt,
+        blob7 AS clientId
+      FROM ${DATASET}
+      WHERE blob1 = ${project}
+        AND blob2 = 'workflow_stage_runtime'
+        AND blob19 = 'tender-analysis'
+        AND blob7 != ''
+        AND ${aeRangeCondition('30')}
+      ORDER BY occurredAt ASC
+      LIMIT ${MAX_ANALYTICS_ROWS}
+    `),
+  ]);
+
+  const runStartsByClient = new Map();
+  for (const row of runStartsResult.data || []) {
+    if (!runStartsByClient.has(row.clientId)) runStartsByClient.set(row.clientId, []);
+    runStartsByClient.get(row.clientId).push(row.occurredAt);
+  }
+
+  return (result.data || []).map((row) => {
+    const starts = runStartsByClient.get(row.clientId) || [];
+    let low = 0;
+    let high = starts.length - 1;
+    let runStartedAt = '';
+    while (low <= high) {
+      const middle = Math.floor((low + high) / 2);
+      if (starts[middle] <= row.occurredAt) {
+        runStartedAt = starts[middle];
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+    return {
+      ...row,
+      runId: runStartedAt ? `run-${runStartedAt.replaceAll(/[^0-9]/g, '').slice(0, 14)}` : '',
+    };
+  });
 }
 
 export async function queryStatsAgentRuntime(env, projectName, range) {
