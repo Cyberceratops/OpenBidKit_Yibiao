@@ -1046,6 +1046,37 @@ async function queryStatsAgentLatency(env, projectName, range) {
   };
 }
 
+export async function queryStatsAgentLatencyRuns(env, projectName, range) {
+  const project = sqlString(projectName);
+  const latencyRange = range === 'history' ? '30' : range;
+  const stageEventCondition = `(blob2 = 'workflow_stage_runtime' OR (blob2 = 'agent_runtime' AND blob19 NOT IN ('tender-analysis', 'fact-extraction', 'content-generation', 'image-generation')))`;
+  const pipelineStageCondition = `blob19 IN ('tender-analysis', 'outline-extraction', 'outline-generation', 'outline-refinement', 'fact-extraction', 'content-generation', 'content-refinement', 'image-planning', 'image-generation')`;
+  const result = await queryAnalytics(env, `
+    SELECT
+      ${businessDateTimeSqlExpression()} AS occurredAt,
+      blob2 AS event,
+      blob4 AS version,
+      blob5 AS platform,
+      blob6 AS arch,
+      blob7 AS clientId,
+      blob19 AS rawStage,
+      if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
+      blob20 AS status,
+      double5 AS durationMs,
+      _sample_interval AS sampleInterval
+    FROM ${DATASET}
+    WHERE blob1 = ${project}
+      AND ${stageEventCondition}
+      AND ${pipelineStageCondition}
+      AND blob19 != ''
+      AND double5 > 0
+      AND ${aeRangeCondition(latencyRange)}
+    ORDER BY occurredAt DESC
+    LIMIT ${MAX_ANALYTICS_ROWS}
+  `);
+  return result.data || [];
+}
+
 export async function queryStatsAgentRuntime(env, projectName, range) {
   if (range === 'history') {
     const db = requireStatsDb(env);

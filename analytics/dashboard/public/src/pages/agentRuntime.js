@@ -1,5 +1,5 @@
-import { assertReady, buildRangeQuery, getEncodedProjectAndDays, loadProjectOptions, requestJson, saveSettings } from '../api.js';
-import { escapeHtml, formatNumber, formatPercent } from '../render.js';
+import { assertReady, buildRangeQuery, getEncodedProjectAndDays, loadProjectOptions, requestDownload, requestJson, saveSettings } from '../api.js';
+import { escapeHtml, formatNumber, formatPercent, setError, setStatus } from '../render.js';
 import { state } from '../state.js';
 
 const AGENT_STAGE_META = {
@@ -165,6 +165,7 @@ function renderLatencySection(latency = {}) {
           <h3>近期阶段耗时明细</h3>
           <p>每条记录对应一次真实业务阶段或 Agent 任务</p>
         </div>
+        <button type="button" class="secondary-button" data-agent-latency-export>导出原始数据（CSV）</button>
       </div>
       ${recentRuns.length ? `
         <div class="agent-latency-recent-table">
@@ -218,6 +219,29 @@ function bindLatencyStageInteractions(stats) {
       modelHeading.textContent = selectedLabel ? `模型维度 · ${selectedLabel} · ${selectedWindow}` : '模型维度';
       state.agentRuntimeModels.innerHTML = renderModelRows(selectedStats.models || []);
     });
+  }
+}
+
+async function exportAgentLatencyRuns(button) {
+  try {
+    assertReady();
+    saveSettings();
+    button.disabled = true;
+    button.textContent = '正在导出…';
+    const range = String(state.agentRange.value || 'history');
+    const { projectName } = getEncodedProjectAndDays();
+    await requestDownload(
+      `/api/agent-runtime/export?projectName=${projectName}&${buildRangeQuery(range)}`,
+      `agent-latency-${range}.csv`,
+    );
+    setError('');
+    setStatus('ok', '原始数据已导出');
+  } catch (error) {
+    setStatus('error', '导出失败');
+    setError(error?.message || String(error));
+  } finally {
+    button.disabled = false;
+    button.textContent = '导出原始数据（CSV）';
   }
 }
 
@@ -326,6 +350,8 @@ function renderAgentRuntime(stats = {}) {
   `;
   state.agentRuntimeModels.innerHTML = renderModelRows(models);
   bindLatencyStageInteractions(stats);
+  const exportButton = state.agentRuntime.querySelector('[data-agent-latency-export]');
+  exportButton?.addEventListener('click', () => void exportAgentLatencyRuns(exportButton));
 }
 
 export async function loadAgentRuntime() {

@@ -1,5 +1,5 @@
 import { corsHeaders, json } from './http.js';
-import { handleAgentRuntime } from './routes/agentRuntime.js';
+import { handleAgentRuntime, handleAgentRuntimeExport } from './routes/agentRuntime.js';
 import { handleAdminAgentErrorConfig, handleAdminAgentErrorDownload, handleAdminAgentErrors, handleAgentErrorIngest } from './routes/agentErrors.js';
 import { handleClients, handleClientDetail, handleIpStats } from './routes/clients.js';
 import { handleConfigUsage, handleModelUsage } from './routes/configUsage.js';
@@ -55,6 +55,7 @@ const routes = new Map([
   ['/api/config-usage', handleConfigUsage],
   ['/api/model-usage', handleModelUsage],
   ['/api/agent-runtime', handleAgentRuntime],
+  ['/api/agent-runtime/export', handleAgentRuntimeExport],
   ['/api/agent-errors/config', handleAdminAgentErrorConfig],
   ['/api/agent-errors/download', handleAdminAgentErrorDownload],
   ['/api/agent-errors', handleAdminAgentErrors],
