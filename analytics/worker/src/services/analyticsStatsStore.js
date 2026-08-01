@@ -944,7 +944,7 @@ async function queryStatsAgentLatency(env, projectName, range) {
       return await queryAnalytics(env, sql);
     } catch (error) {
       console.warn(`[analytics] agent latency ${name} query unavailable`, error?.message || String(error));
-      return { data: [] };
+      return { data: [], queryFailed: true };
     }
   };
   const [stageResult, trendResult, recentResult] = await Promise.all([
@@ -998,7 +998,7 @@ async function queryStatsAgentLatency(env, projectName, range) {
         AND blob19 != ''
         AND double5 > 0
         AND ${rangeCondition}
-      ORDER BY timestamp DESC
+      ORDER BY occurredAt DESC
       LIMIT 20
     `),
   ]);
@@ -1035,6 +1035,7 @@ async function queryStatsAgentLatency(env, projectName, range) {
     available: stages.length > 0,
     windowRange: latencyRange,
     stages,
+    recentRunsQueryFailed: recentResult.queryFailed === true,
     recentRuns: (recentResult.data || []).map((row) => ({
       occurredAt: normalizeText(row.occurredAt, 30),
       runtime: normalizeText(row.runtime, 40) || 'workflow',

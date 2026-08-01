@@ -185,7 +185,7 @@ function renderLatencySection(latency = {}) {
             }).join('')}</tbody>
           </table>
         </div>
-      ` : '<div class="empty">当前窗口暂无近期任务记录。</div>'}
+      ` : `<div class="empty">${latency.recentRunsQueryFailed ? '近期任务明细查询失败，请刷新后重试。' : '当前窗口暂无近期任务记录。'}</div>`}
     </section>
   `;
 }
