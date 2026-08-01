@@ -612,10 +612,11 @@ export async function queryStatsTraffic(env, projectName, range) {
 
 async function queryConfigHistoryField(db, projectName, field) {
   return all(db, `
-    SELECT value, report_count AS events
+    SELECT value, accurate_report_count AS events
     FROM stats_configs
     WHERE project_name = ? AND field_key = ?
-    ORDER BY report_count DESC, value ASC
+      AND accurate_report_count > 0
+    ORDER BY accurate_report_count DESC, value ASC
     LIMIT 50
   `, [projectName, field.key]);
 }
@@ -631,6 +632,7 @@ async function queryConfigAeField(env, projectName, range, field) {
       AND blob2 = 'config_usage'
       AND blob9 = ${sqlString(field.key)}
       AND blob10 != ''
+      AND blob19 = 'config-usage-v2'
       AND ${aeRangeCondition(range)}
     GROUP BY value
     ORDER BY events DESC, value ASC
@@ -659,10 +661,11 @@ async function queryModelHistoryField(db, projectName, field, filters) {
       provider,
       endpoint_host,
       model,
-      request_count AS events,
-      total_tokens AS totalTokens
+      successful_request_count AS events,
+      successful_total_tokens AS totalTokens
     FROM stats_models
-    WHERE project_name = ? AND request_type = ?${modelFiltersSql(filters)}
+    WHERE project_name = ? AND request_type = ?
+      AND successful_request_count > 0${modelFiltersSql(filters)}
     ORDER BY events DESC, model ASC
     LIMIT 100
   `, [projectName, field.requestType]);
@@ -682,6 +685,8 @@ async function queryModelAeField(env, projectName, range, field, filters) {
       AND blob2 = 'ai_request'
       AND blob12 = ${sqlString(field.requestType)}
       AND blob11 != ''
+      AND blob19 = 'success'
+      AND blob20 = 'production'
       AND ${aeRangeCondition(range)}
       ${modelFiltersAeSql(filters)}
     GROUP BY provider, endpoint_host, model
@@ -856,6 +861,37 @@ function createAgentRuntimeResponse(rows = []) {
   };
 }
 
+async function queryStatsAgentRuntimeByStage(env, projectName, range) {
+  const project = sqlString(projectName);
+  const stageRange = range === 'history' ? '30' : range;
+  const result = await queryAnalytics(env, `
+    SELECT
+      if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
+      blob9 AS metricKey,
+      SUM(_sample_interval) AS count
+    FROM ${DATASET}
+    WHERE blob1 = ${project}
+      AND blob2 = 'agent_runtime'
+      AND blob9 != ''
+      AND blob19 != ''
+      AND ${aeRangeCondition(stageRange)}
+    GROUP BY stage, metricKey
+    ORDER BY stage ASC, count DESC, metricKey ASC
+    LIMIT ${MAX_ANALYTICS_ROWS}
+  `);
+  const rowsByStage = new Map();
+  for (const row of result.data || []) {
+    const stage = normalizeText(row.stage, 50);
+    if (!stage) continue;
+    if (!rowsByStage.has(stage)) rowsByStage.set(stage, []);
+    rowsByStage.get(stage).push(row);
+  }
+  return Object.fromEntries(Array.from(rowsByStage.entries()).map(([stage, rows]) => [
+    stage,
+    createAgentRuntimeResponse(createAgentRuntimeRowsFromMetricRows(rows)),
+  ]));
+}
+
 async function ensureAgentRuntimeStatsTable(db) {
   await run(db, `
     CREATE TABLE IF NOT EXISTS stats_agent_runtime (
@@ -903,6 +939,14 @@ async function queryStatsAgentLatency(env, projectName, range) {
       recentRuns: [],
     };
   }
+  const queryOptionalLatencyData = async (name, sql) => {
+    try {
+      return await queryAnalytics(env, sql);
+    } catch (error) {
+      console.warn(`[analytics] agent latency ${name} query unavailable`, error?.message || String(error));
+      return { data: [] };
+    }
+  };
   const [stageResult, trendResult, recentResult] = await Promise.all([
     queryAnalytics(env, `
       SELECT
@@ -924,7 +968,7 @@ async function queryStatsAgentLatency(env, projectName, range) {
       ORDER BY avgDurationMs DESC, stage ASC
       LIMIT 50
     `),
-    queryAnalytics(env, `
+    queryOptionalLatencyData('trend', `
       SELECT
         ${businessDateSqlExpression()} AS day,
         if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
@@ -940,9 +984,9 @@ async function queryStatsAgentLatency(env, projectName, range) {
       ORDER BY day ASC, stage ASC
       LIMIT 500
     `),
-    queryAnalytics(env, `
+    queryOptionalLatencyData('recent runs', `
       SELECT
-        ${businessDateTimeSqlExpression('max(timestamp)')} AS occurredAt,
+        ${businessDateTimeSqlExpression()} AS occurredAt,
         blob5 AS runtime,
         if(blob19 = 'outline-extraction', 'outline-generation', blob19) AS stage,
         blob20 AS status,
@@ -954,8 +998,7 @@ async function queryStatsAgentLatency(env, projectName, range) {
         AND blob19 != ''
         AND double5 > 0
         AND ${rangeCondition}
-      GROUP BY blob7, runtime, stage, status, durationMs
-      ORDER BY max(timestamp) DESC
+      ORDER BY timestamp DESC
       LIMIT 20
     `),
   ]);
@@ -1022,29 +1065,39 @@ export async function queryStatsAgentRuntime(env, projectName, range) {
       WHERE project_name = ?
       ORDER BY total_count DESC, runtime ASC, provider ASC, endpoint_host ASC, model ASC
     `, [projectName]);
+    const [latency, stageBreakdowns] = await Promise.all([
+      queryStatsAgentLatency(env, projectName, range),
+      queryStatsAgentRuntimeByStage(env, projectName, range),
+    ]);
     return {
       ...createAgentRuntimeResponse(rows),
-      latency: await queryStatsAgentLatency(env, projectName, range),
+      latency,
+      stageBreakdowns,
     };
   }
 
   const project = sqlString(projectName);
-  const result = await queryAnalytics(env, `
-    SELECT
-      blob9 AS metricKey,
-      SUM(_sample_interval) AS count
-    FROM ${DATASET}
-    WHERE blob1 = ${project}
-      AND blob2 = 'agent_runtime'
-      AND blob9 != ''
-      AND ${aeRangeCondition(range)}
-    GROUP BY metricKey
-    ORDER BY count DESC, metricKey ASC
-    LIMIT ${MAX_ANALYTICS_ROWS}
-  `);
+  const [result, latency, stageBreakdowns] = await Promise.all([
+    queryAnalytics(env, `
+      SELECT
+        blob9 AS metricKey,
+        SUM(_sample_interval) AS count
+      FROM ${DATASET}
+      WHERE blob1 = ${project}
+        AND blob2 = 'agent_runtime'
+        AND blob9 != ''
+        AND ${aeRangeCondition(range)}
+      GROUP BY metricKey
+      ORDER BY count DESC, metricKey ASC
+      LIMIT ${MAX_ANALYTICS_ROWS}
+    `),
+    queryStatsAgentLatency(env, projectName, range),
+    queryStatsAgentRuntimeByStage(env, projectName, range),
+  ]);
   return {
     ...createAgentRuntimeResponse(createAgentRuntimeRowsFromMetricRows(result.data || [])),
-    latency: await queryStatsAgentLatency(env, projectName, range),
+    latency,
+    stageBreakdowns,
   };
 }
 
@@ -1901,7 +1954,12 @@ async function runVersionsStage(env, activityDate, projectNames, completedByProj
 
 async function queryRollupConfigRows(env, activityDate, projectNames) {
   const result = await queryAnalytics(env, `
-    SELECT blob1 AS projectName, blob9 AS fieldKey, blob10 AS value, SUM(_sample_interval) AS events
+    SELECT
+      blob1 AS projectName,
+      blob9 AS fieldKey,
+      blob10 AS value,
+      SUM(_sample_interval) AS reportCount,
+      SUM(if(blob19 = 'config-usage-v2', _sample_interval, 0)) AS accurateReportCount
     FROM ${DATASET}
     WHERE blob1 IN ${projectsSql(projectNames)}
       AND blob2 = 'config_usage'
@@ -1916,8 +1974,9 @@ async function queryRollupConfigRows(env, activityDate, projectNames) {
     projectName: normalizeProjectName(row.projectName),
     fieldKey: normalizeText(row.fieldKey, 80),
     value: normalizeText(row.value, 200),
-    events: number(row.events),
-  })).filter((row) => row.projectName && row.fieldKey && row.value && row.events > 0);
+    reportCount: number(row.reportCount),
+    accurateReportCount: number(row.accurateReportCount),
+  })).filter((row) => row.projectName && row.fieldKey && row.value && row.reportCount > 0);
 }
 
 function prepareConfigStatements(db, rows, updatedAt) {
@@ -1928,15 +1987,17 @@ function prepareConfigStatements(db, rows, updatedAt) {
         json_extract(item.value, '$.projectName') AS project_name,
         json_extract(item.value, '$.fieldKey') AS field_key,
         json_extract(item.value, '$.value') AS config_value,
-        CAST(json_extract(item.value, '$.events') AS INTEGER) AS report_count
+        CAST(json_extract(item.value, '$.reportCount') AS INTEGER) AS report_count,
+        CAST(json_extract(item.value, '$.accurateReportCount') AS INTEGER) AS accurate_report_count
       FROM json_each(?) AS item
     )
-    INSERT INTO stats_configs (project_name, field_key, value, report_count, updated_at)
-    SELECT project_name, field_key, config_value, report_count, ?
+    INSERT INTO stats_configs (project_name, field_key, value, report_count, accurate_report_count, updated_at)
+    SELECT project_name, field_key, config_value, report_count, accurate_report_count, ?
     FROM rows
     WHERE project_name != '' AND field_key != '' AND config_value != ''
     ON CONFLICT(project_name, field_key, value) DO UPDATE SET
       report_count = stats_configs.report_count + excluded.report_count,
+      accurate_report_count = stats_configs.accurate_report_count + excluded.accurate_report_count,
       updated_at = excluded.updated_at
   `).bind(json, updatedAt)];
 }
@@ -1960,7 +2021,9 @@ async function queryRollupModelRows(env, activityDate, projectNames) {
       blob10 AS endpointHost,
       blob11 AS model,
       SUM(_sample_interval) AS requestCount,
-      SUM(double4 * _sample_interval) AS totalTokens
+      SUM(double4 * _sample_interval) AS totalTokens,
+      SUM(if(blob19 = 'success' AND blob20 = 'production', _sample_interval, 0)) AS successfulRequestCount,
+      SUM(if(blob19 = 'success' AND blob20 = 'production', double4 * _sample_interval, 0)) AS successfulTotalTokens
     FROM ${DATASET}
     WHERE blob1 IN ${projectsSql(projectNames)}
       AND blob2 = 'ai_request'
@@ -1979,6 +2042,8 @@ async function queryRollupModelRows(env, activityDate, projectNames) {
     model: normalizeText(row.model, 160),
     requestCount: number(row.requestCount),
     totalTokens: number(row.totalTokens),
+    successfulRequestCount: number(row.successfulRequestCount),
+    successfulTotalTokens: number(row.successfulTotalTokens),
   })).filter((row) => row.projectName && row.requestType && row.model && row.requestCount > 0);
 }
 
@@ -1993,16 +2058,24 @@ function prepareModelStatements(db, rows, updatedAt) {
         json_extract(item.value, '$.endpointHost') AS endpoint_host,
         json_extract(item.value, '$.model') AS model,
         CAST(json_extract(item.value, '$.requestCount') AS INTEGER) AS request_count,
-        CAST(json_extract(item.value, '$.totalTokens') AS INTEGER) AS total_tokens
+        CAST(json_extract(item.value, '$.totalTokens') AS INTEGER) AS total_tokens,
+        CAST(json_extract(item.value, '$.successfulRequestCount') AS INTEGER) AS successful_request_count,
+        CAST(json_extract(item.value, '$.successfulTotalTokens') AS INTEGER) AS successful_total_tokens
       FROM json_each(?) AS item
     )
-    INSERT INTO stats_models (project_name, request_type, provider, endpoint_host, model, request_count, total_tokens, updated_at)
-    SELECT project_name, request_type, provider, endpoint_host, model, request_count, total_tokens, ?
+    INSERT INTO stats_models (
+      project_name, request_type, provider, endpoint_host, model,
+      request_count, total_tokens, successful_request_count, successful_total_tokens, updated_at
+    )
+    SELECT project_name, request_type, provider, endpoint_host, model,
+      request_count, total_tokens, successful_request_count, successful_total_tokens, ?
     FROM rows
     WHERE project_name != '' AND request_type != '' AND model != ''
     ON CONFLICT(project_name, request_type, provider, endpoint_host, model) DO UPDATE SET
       request_count = stats_models.request_count + excluded.request_count,
       total_tokens = stats_models.total_tokens + excluded.total_tokens,
+      successful_request_count = stats_models.successful_request_count + excluded.successful_request_count,
+      successful_total_tokens = stats_models.successful_total_tokens + excluded.successful_total_tokens,
       updated_at = excluded.updated_at
   `).bind(json, updatedAt)];
 }
@@ -2400,12 +2473,12 @@ export async function refreshOverviewAiTotals(env, projectNames) {
       UPDATE stats_totals
       SET
         total_text_tokens = COALESCE((
-          SELECT SUM(total_tokens)
+          SELECT SUM(successful_total_tokens)
           FROM stats_models
           WHERE project_name = ? AND request_type = 'text'
         ), 0),
         total_generated_images = COALESCE((
-          SELECT SUM(request_count)
+          SELECT SUM(successful_request_count)
           FROM stats_models
           WHERE project_name = ? AND request_type = 'image'
         ), 0),

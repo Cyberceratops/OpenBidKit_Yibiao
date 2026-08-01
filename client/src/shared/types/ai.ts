@@ -11,6 +11,7 @@ export interface ChatRequestOptions {
   timeout_message?: string;
   logTitle?: string;
   log_title?: string;
+  analytics_purpose?: 'test' | 'production';
 }
 
 export interface ChatCompletionRequest extends ChatRequestOptions {

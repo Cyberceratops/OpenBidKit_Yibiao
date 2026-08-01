@@ -20,6 +20,7 @@ function labelConfigValue(groupKey, value) {
     enableConsistencyAudit: { true: '开启', false: '关闭' },
     consistencyRepairModes: { normal: '普通修复', agent: 'Agent 修复' },
     enableOriginalPlanCoverageAudit: { true: '开启', false: '关闭' },
+    originalPlanCoverageRepairModes: { normal: '普通修复', agent: 'Agent 修复' },
     wordControlEnabled: { true: '开启', false: '关闭' },
     strictSectionWords: { true: '开启', false: '关闭' },
     contentGenerationActions: {
@@ -55,13 +56,14 @@ const configUsageGroups = [
     ['enableConsistencyAudit', '全文一致性审计'],
     ['consistencyRepairModes', '全文一致性修复方式'],
     ['enableOriginalPlanCoverageAudit', '原方案覆盖审计'],
+    ['originalPlanCoverageRepairModes', '原方案覆盖修复方式'],
     ['useMermaidImages', 'Mermaid 图片'],
   ['useAiImages', 'AI 生图'],
 ];
 
 const modelUsageGroups = [
-  ['textModelUsage', '文本模型请求'],
-  ['imageModelUsage', '生图模型请求'],
+  ['textModelUsage', '成功文本模型业务请求'],
+  ['imageModelUsage', '成功生图业务请求'],
 ];
 
 function renderUsageGroups(target, usage, groups) {

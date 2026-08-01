@@ -626,7 +626,6 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
       if (result?.success) {
         setSavedConfig(config);
         onDeveloperModeChange?.(Boolean(config.developer_mode));
-        trackConfigUsage({}, config);
       }
       return Boolean(result?.success);
     } catch (error) {
@@ -783,6 +782,7 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
         timeout_ms: 30000,
         timeout_message: '文本模型测试超时，请检查 Base URL、API Key 或模型名称',
         logTitle: '文本模型测试',
+        analytics_purpose: 'test',
       });
       const reply = (content || '').trim();
       if (!reply) {
@@ -871,7 +871,14 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
   };
 
   const saveImageConfig = async () => {
-    await saveClientConfig(createClientConfig());
+    const config = createClientConfig();
+    const saved = await saveClientConfig(config);
+    if (saved && config.image_model.api_key.trim()) {
+      trackConfigUsage({
+        image_provider: config.image_model.provider,
+        image_model_status: config.image_model.status,
+      });
+    }
   };
 
   const testImageConfig = async () => {
@@ -906,7 +913,12 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
         },
       }));
       setSavedConfig(testedConfig);
-      trackConfigUsage({}, testedConfig);
+      if (testedConfig.image_model.api_key.trim()) {
+        trackConfigUsage({
+          image_provider: testedConfig.image_model.provider,
+          image_model_status: testedConfig.image_model.status,
+        });
+      }
       const previewSrc = result?.image_url || (result?.image_data ? `data:${result.mime_type || 'image/png'};base64,${result.image_data}` : '');
 
       if (previewSrc) {
@@ -941,7 +953,12 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
         },
       }));
       setSavedConfig(failedConfig);
-      trackConfigUsage({}, failedConfig);
+      if (failedConfig.image_model.api_key.trim()) {
+        trackConfigUsage({
+          image_provider: failedConfig.image_model.provider,
+          image_model_status: failedConfig.image_model.status,
+        });
+      }
       showToast(message, 'error');
     } finally {
       setTestingImageModel(false);
@@ -949,7 +966,12 @@ function SettingsPage({ onDeveloperModeChange }: SettingsPageProps) {
   };
 
   const saveComponentsConfig = async () => {
-    await saveClientConfig(createClientConfig());
+    const config = createClientConfig();
+    const saved = await saveClientConfig(config);
+    const parser = config.components.file_parser;
+    if (saved && (parser.provider === 'local' || Boolean(parser.mineru_token?.trim()))) {
+      trackConfigUsage({ file_parser_provider: parser.provider });
+    }
   };
 
   const openConfigFolder = async () => {

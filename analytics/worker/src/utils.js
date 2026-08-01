@@ -107,7 +107,8 @@ export function businessDateSqlExpression(value = 'timestamp') {
 }
 
 export function businessDateTimeSqlExpression(value = 'timestamp') {
-  return `formatDateTime(${value}, '%Y-%m-%d %H:%M:%S', '${BUSINESS_TIME_ZONE}')`;
+  // Analytics Engine 使用 ClickHouse 格式：%i 是分钟，%M 是英文完整月份名。
+  return `formatDateTime(${value}, '%Y-%m-%d %H:%i:%S', '${BUSINESS_TIME_ZONE}')`;
 }
 
 export function businessDateRangeCondition(startDate, endDate = getBusinessToday()) {

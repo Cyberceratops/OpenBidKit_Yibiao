@@ -190,9 +190,12 @@ function renderLatencySection(latency = {}) {
   `;
 }
 
-function bindLatencyStageInteractions() {
+function bindLatencyStageInteractions(stats) {
   const buttons = Array.from(state.agentRuntime.querySelectorAll('[data-agent-latency-stage]'));
   const details = Array.from(state.agentRuntime.querySelectorAll('[data-agent-latency-detail]'));
+  const runtimeHeading = state.agentRuntime.querySelector('[data-agent-runtime-heading]');
+  const runtimeTable = state.agentRuntime.querySelector('[data-agent-runtime-table]');
+  const modelHeading = state.agentRuntimeModels.previousElementSibling;
   let activeStage = '';
 
   for (const button of buttons) {
@@ -207,6 +210,13 @@ function bindLatencyStageInteractions() {
       for (const detail of details) {
         detail.hidden = detail.dataset.agentLatencyDetail !== activeStage;
       }
+      const selectedStats = activeStage ? stats.stageBreakdowns?.[activeStage] || {} : stats;
+      const selectedLabel = activeStage ? getStageMeta(activeStage).label : '';
+      const selectedWindow = activeStage ? latencyWindowLabel(stats.latency?.windowRange) : '';
+      runtimeHeading.textContent = selectedLabel ? `运行时维度 · ${selectedLabel} · ${selectedWindow}` : '运行时维度';
+      runtimeTable.innerHTML = renderRuntimeRows(selectedStats.runtimes || []);
+      modelHeading.textContent = selectedLabel ? `模型维度 · ${selectedLabel} · ${selectedWindow}` : '模型维度';
+      state.agentRuntimeModels.innerHTML = renderModelRows(selectedStats.models || []);
     });
   }
 }
@@ -309,13 +319,13 @@ function renderAgentRuntime(stats = {}) {
       </section>
       ${renderLatencySection(stats.latency || {})}
       <div class="agent-runtime-breakdown panel">
-        <h3>运行时维度</h3>
-        ${renderRuntimeRows(runtimes)}
+        <h3 data-agent-runtime-heading>运行时维度</h3>
+        <div data-agent-runtime-table>${renderRuntimeRows(runtimes)}</div>
       </div>
     </div>
   `;
   state.agentRuntimeModels.innerHTML = renderModelRows(models);
-  bindLatencyStageInteractions();
+  bindLatencyStageInteractions(stats);
 }
 
 export async function loadAgentRuntime() {

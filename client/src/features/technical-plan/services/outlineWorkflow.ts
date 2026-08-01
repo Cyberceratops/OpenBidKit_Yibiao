@@ -26,6 +26,7 @@ export interface GenerateOutlineOptions {
   requirements: string;
   oldOutline?: string;
   onProgress?: ProgressCallback;
+  analyticsPurpose?: 'test' | 'production';
 }
 
 function emit(onProgress: ProgressCallback | undefined, message: string) {
@@ -73,8 +74,8 @@ function renumberOutline(outline: OutlineData): OutlineData {
   return { ...outline, outline: renumberItems(outline.outline || []) };
 }
 
-async function requestJson<TResult>(messages: Parameters<typeof aiClient.requestJson>[0]['messages'], logTitle = '目录生成') {
-  return aiClient.requestJson<TResult>({ messages, logTitle });
+async function requestJson<TResult>(messages: Parameters<typeof aiClient.requestJson>[0]['messages'], logTitle = '目录生成', analyticsPurpose?: 'test' | 'production') {
+  return aiClient.requestJson<TResult>({ messages, logTitle, analytics_purpose: analyticsPurpose });
 }
 
 function buildTopLevelFromGroups(groups: TechnicalRequirementGroup[]): OutlineItem[] {
@@ -90,7 +91,8 @@ function buildTopLevelFromGroups(groups: TechnicalRequirementGroup[]): OutlineIt
 async function extractRequirementGroups(options: GenerateOutlineOptions, suggestions?: string[]) {
   const payload = await requestJson<RequirementGroupsResponse>(
     buildRequirementGroupsMessages(options.requirements, suggestions),
-    '目录生成-技术评分大类'
+    '目录生成-技术评分大类',
+    options.analyticsPurpose,
   );
   if (!payload.groups?.length) {
     throw new Error('技术评分大类不能为空');
@@ -106,7 +108,7 @@ async function generateAlignedChildren(options: GenerateOutlineOptions, parentIt
     parentItem,
     requirementGroup,
     suggestions,
-  }), `目录生成-${parentItem.title || '未命名章节'}子目录`);
+  }), `目录生成-${parentItem.title || '未命名章节'}子目录`, options.analyticsPurpose);
   validateChildren(payload);
   return payload.children;
 }
@@ -135,7 +137,7 @@ async function reviewAlignedOutline(options: GenerateOutlineOptions, groups: Tec
     requirements: options.requirements,
     groupsJson: JSON.stringify({ groups }),
     outlineJson: JSON.stringify(outline),
-  }), `目录生成-${stageLabel}`);
+  }), `目录生成-${stageLabel}`, options.analyticsPurpose);
 }
 
 async function generateAlignedOutlineWorkflow(options: GenerateOutlineOptions) {

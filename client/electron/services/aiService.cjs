@@ -262,6 +262,8 @@ function trackAiRequest(app, config, payload) {
         client_id: config.analytics_client_id || '',
         client_created_at: config.analytics_created_at || '',
         ai_request_type: requestType,
+        ai_request_status: payload.ai_request_status === 'success' ? 'success' : 'failed',
+        ai_request_purpose: payload.ai_request_purpose === 'test' ? 'test' : 'production',
         ai_model_provider: modelProvider,
         ai_model_base_url: modelEndpointHost,
         ai_model_name: modelName,
@@ -685,7 +687,7 @@ function normalizeJsonPayload(request, parsed) {
   return normalized;
 }
 
-async function repairJsonResponse(app, config, invalidContent, issues, responseFormat, progressCallback, progressLabel, repairMessagesBuilder, logTitle) {
+async function repairJsonResponse(app, config, invalidContent, issues, responseFormat, progressCallback, progressLabel, repairMessagesBuilder, logTitle, analyticsPurpose) {
   await emitProgress(progressCallback, `${progressLabel}格式校验失败，正在基于当前结果进行修复。`);
   return chatWithConfig(app, config, {
     messages: repairMessagesBuilder
@@ -693,6 +695,7 @@ async function repairJsonResponse(app, config, invalidContent, issues, responseF
       : buildJsonRepairMessages(invalidContent, issues, progressLabel),
     response_format: responseFormat,
     logTitle: logTitle ? `${logTitle}修复` : `${progressLabel}修复`,
+    analytics_purpose: analyticsPurpose,
   });
 }
 
@@ -717,6 +720,7 @@ async function parseOrRepairJsonResponseWithConfig(app, config, request, content
         progressLabel,
         request.repairMessagesBuilder,
         logTitle,
+        request.analytics_purpose,
       );
       return normalizeJsonPayload(request, parseJsonContent(repairedContent));
     } catch {
@@ -741,6 +745,7 @@ async function collectJsonResponseWithConfig(app, config, request) {
       timeout_ms: request.timeout_ms,
       timeout_message: request.timeout_message,
       logTitle,
+      analytics_purpose: request.analytics_purpose,
     });
 
     try {
@@ -761,6 +766,7 @@ async function collectJsonResponseWithConfig(app, config, request) {
           progressLabel,
           request.repairMessagesBuilder,
           logTitle,
+          request.analytics_purpose,
         );
         const repairedParsed = parseJsonContent(repairedContent);
         return normalizeJsonPayload(request, repairedParsed);
@@ -1275,7 +1281,12 @@ async function chatWithConfig(app, config, request) {
 
     responseData = result.responseData;
     recordTextTokenStats(config, result.usage);
-    trackAiRequest(app, config, { ai_request_type: 'text', usage: result.usage });
+    trackAiRequest(app, config, {
+      ai_request_type: 'text',
+      ai_request_status: 'success',
+      ai_request_purpose: request.analytics_purpose,
+      usage: result.usage,
+    });
     analyticsTracked = true;
     const content = result.content || '';
     writeAiLog(app, config, {
@@ -1296,7 +1307,11 @@ async function chatWithConfig(app, config, request) {
       : error.message;
     if (!analyticsTracked) {
       recordTextTokenStats(config, null);
-      trackAiRequest(app, config, { ai_request_type: 'text' });
+      trackAiRequest(app, config, {
+        ai_request_type: 'text',
+        ai_request_status: 'failed',
+        ai_request_purpose: request.analytics_purpose,
+      });
       analyticsTracked = true;
     }
     writeAiLog(app, config, {
@@ -1327,7 +1342,6 @@ async function testOpenAICompatibleImageModel(app, config, provider) {
   const imageConfig = config.image_model || {};
   const meta = OPENAI_IMAGE_PROVIDER_META[provider] || OPENAI_IMAGE_PROVIDER_META.custom;
   let responseData = null;
-  let analyticsTracked = false;
 
   if (!imageConfig.api_key) {
     throw new Error(`请先填写${meta.label} API Key`);
@@ -1384,8 +1398,6 @@ async function testOpenAICompatibleImageModel(app, config, provider) {
       throw error;
     }
 
-    trackAiRequest(app, config, { ai_request_type: 'image', usage: extractOpenAIUsage(responseData) });
-    analyticsTracked = true;
     const firstImage = responseData.data?.[0] || {};
     const imageUrl = firstImage.url || '';
     const imageData = firstImage.b64_json || '';
@@ -1409,6 +1421,12 @@ async function testOpenAICompatibleImageModel(app, config, provider) {
       },
       created_at: new Date().toISOString(),
     });
+    trackAiRequest(app, config, {
+      ai_request_type: 'image',
+      ai_request_status: 'success',
+      ai_request_purpose: 'test',
+      usage: extractOpenAIUsage(responseData),
+    });
 
     return {
       success: true,
@@ -1418,9 +1436,12 @@ async function testOpenAICompatibleImageModel(app, config, provider) {
       mime_type: 'image/png',
     };
   } catch (error) {
-    if (!analyticsTracked) {
-      trackAiRequest(app, config, { ai_request_type: 'image' });
-    }
+    trackAiRequest(app, config, {
+      ai_request_type: 'image',
+      ai_request_status: 'failed',
+      ai_request_purpose: 'test',
+      usage: extractOpenAIUsage(responseData),
+    });
     const errorMessage = error?.name === 'AbortError' ? IMAGE_MODEL_TEST_TIMEOUT_MESSAGE : error?.message || '生图模型测试失败';
     writeAiLog(app, config, {
       request_id: requestId,
@@ -1441,7 +1462,6 @@ async function testOpenAICompatibleImageModel(app, config, provider) {
 
 async function testGoogleImageModel(app, config) {
   const imageConfig = config.image_model || {};
-  let analyticsTracked = false;
 
   if (!imageConfig.api_key) {
     throw new Error('请先填写 Google AI Studio API Key');
@@ -1482,8 +1502,6 @@ async function testGoogleImageModel(app, config) {
       ),
       AI_REQUEST_TIMEOUT_MS,
     ));
-    trackAiRequest(app, config, { ai_request_type: 'image', usage: extractGoogleUsage(responseData) });
-    analyticsTracked = true;
     const text = getGoogleText(responseData);
     const inlineData = getGoogleImageInlineData(responseData);
 
@@ -1505,6 +1523,12 @@ async function testGoogleImageModel(app, config) {
       },
       created_at: new Date().toISOString(),
     });
+    trackAiRequest(app, config, {
+      ai_request_type: 'image',
+      ai_request_status: 'success',
+      ai_request_purpose: 'test',
+      usage: extractGoogleUsage(responseData),
+    });
 
     return {
       success: true,
@@ -1513,9 +1537,12 @@ async function testGoogleImageModel(app, config) {
       mime_type: inlineData?.mimeType || inlineData?.mime_type || 'image/png',
     };
   } catch (error) {
-    if (!analyticsTracked) {
-      trackAiRequest(app, config, { ai_request_type: 'image' });
-    }
+    trackAiRequest(app, config, {
+      ai_request_type: 'image',
+      ai_request_status: 'failed',
+      ai_request_purpose: 'test',
+      usage: extractGoogleUsage(responseData),
+    });
     const errorMessage = error?.name === 'AbortError' ? IMAGE_MODEL_TEST_TIMEOUT_MESSAGE : error?.message || '生图模型测试失败';
     writeAiLog(app, config, {
       request_id: requestId,
@@ -1549,7 +1576,6 @@ async function generateOpenAICompatibleImage(app, config, request, provider) {
   };
   const baseUrl = requireBaseUrl(imageConfig.base_url, `${meta.label} Base URL 缺失，请重新选择服务商后保存配置`);
   let responseData = null;
-  let analyticsTracked = false;
 
   try {
     writeAiLog(app, config, {
@@ -1573,9 +1599,6 @@ async function generateOpenAICompatibleImage(app, config, request, provider) {
       ),
       AI_REQUEST_TIMEOUT_MS,
     ));
-    trackAiRequest(app, config, { ai_request_type: 'image', usage: extractOpenAIUsage(responseData) });
-    analyticsTracked = true;
-
     const item = responseData.data?.[0] || {};
     const image = await createImageFromOpenAICompatibleItem(item);
 
@@ -1595,12 +1618,20 @@ async function generateOpenAICompatibleImage(app, config, request, provider) {
       result: saved,
       created_at: new Date().toISOString(),
     });
+    trackAiRequest(app, config, {
+      ai_request_type: 'image',
+      ai_request_status: 'success',
+      ai_request_purpose: 'production',
+      usage: extractOpenAIUsage(responseData),
+    });
     return { success: true, title: request.title || '', ...saved };
   } catch (error) {
-    if (!analyticsTracked) {
-      trackAiRequest(app, config, { ai_request_type: 'image' });
-      analyticsTracked = true;
-    }
+    trackAiRequest(app, config, {
+      ai_request_type: 'image',
+      ai_request_status: 'failed',
+      ai_request_purpose: 'production',
+      usage: extractOpenAIUsage(responseData),
+    });
     writeAiLog(app, config, {
       request_id: requestId,
       log_title: logTitle,
@@ -1627,7 +1658,6 @@ async function generateGoogleImage(app, config, request) {
   const baseUrl = requireBaseUrl(imageConfig.base_url, 'Google AI Studio Base URL 缺失，请重新选择服务商后保存配置');
   const url = createGoogleImageUrl(baseUrl, imageConfig.model_name, requestMode);
   let responseData = null;
-  let analyticsTracked = false;
 
   try {
     writeAiLog(app, config, {
@@ -1652,8 +1682,6 @@ async function generateGoogleImage(app, config, request) {
       ),
       AI_REQUEST_TIMEOUT_MS,
     ));
-    trackAiRequest(app, config, { ai_request_type: 'image', usage: extractGoogleUsage(responseData) });
-    analyticsTracked = true;
     const inlineData = getGoogleImageInlineData(responseData);
 
     if (!inlineData?.data) {
@@ -1675,12 +1703,20 @@ async function generateGoogleImage(app, config, request) {
       result: saved,
       created_at: new Date().toISOString(),
     });
+    trackAiRequest(app, config, {
+      ai_request_type: 'image',
+      ai_request_status: 'success',
+      ai_request_purpose: 'production',
+      usage: extractGoogleUsage(responseData),
+    });
     return { success: true, title: request.title || '', ...saved };
   } catch (error) {
-    if (!analyticsTracked) {
-      trackAiRequest(app, config, { ai_request_type: 'image' });
-      analyticsTracked = true;
-    }
+    trackAiRequest(app, config, {
+      ai_request_type: 'image',
+      ai_request_status: 'failed',
+      ai_request_purpose: 'production',
+      usage: extractGoogleUsage(responseData),
+    });
     writeAiLog(app, config, {
       request_id: requestId,
       log_title: logTitle,

@@ -361,14 +361,13 @@ function BidAnalysisPage({
         setFullRerunLocked(true);
       }
       const configState = await saveConfig(normalizedTaskIds, false, nextBidSectionMode);
-      const config = await window.yibiao?.config.load();
       await window.yibiao?.tasks.startBidAnalysis({
         mode: configState.mode,
         selected_task_ids: configState.selectedTaskIds,
         task_ids: taskIds,
         force_rerun: forceRerun,
       });
-      trackConfigUsage({ bid_analysis_mode: configState.mode }, config);
+      trackConfigUsage({ bid_analysis_mode: configState.mode });
       setSettingsOpen(false);
       showToast(retryTask ? `${retryTask.label}重新解析任务已在后台启动` : '招标文件解析任务已在后台启动', 'success');
     } catch (error) {

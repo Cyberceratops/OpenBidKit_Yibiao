@@ -4,7 +4,7 @@ import * as Switch from '@radix-ui/react-switch';
 import { memo, useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { trackConfigUsage } from '../../../shared/analytics/analytics';
 import { MarkdownEditor, MarkdownFullscreenViewer, MarkdownRenderer, useToast } from '../../../shared/ui';
-import type { ClientConfig, ImageModelStatus, OutlineData, OutlineItem, OutlineWordControlOptions } from '../../../shared/types';
+import type { ImageModelStatus, OutlineData, OutlineItem, OutlineWordControlOptions } from '../../../shared/types';
 import { countReadableWords } from '../../../shared/utils/wordCount';
 import type { BackgroundTaskState, ConsistencyRepairMode, ContentGenerationOptions, ContentGenerationSectionStatus, ContentGenerationSections, ContentIllustrationKind, ContentIllustrationPlanState, ContentTableRequirement, OriginalPlanCoverageRepairMode, TechnicalPlanWorkflowKind } from '../types';
 import type { ExportFormatConfig } from '../../../shared/types/exportFormat';
@@ -734,13 +734,11 @@ function ContentEditPage({
   const launchContentGeneration = async ({
     savedGenerationOptions,
     nextImageModelAvailable,
-    config,
     regenerate,
     contentGenerationAction,
   }: {
     savedGenerationOptions: ContentGenerationOptions;
     nextImageModelAvailable: boolean;
-    config?: ClientConfig | null;
     regenerate: boolean;
     contentGenerationAction: ContentGenerationAction;
   }) => {
@@ -781,7 +779,7 @@ function ContentEditPage({
       consistency_repair_mode: savedGenerationOptions.enableConsistencyAudit ? savedGenerationOptions.consistencyRepairMode : undefined,
       enable_original_plan_coverage_audit: isExpansionWorkflow && savedGenerationOptions.enableOriginalPlanCoverageAudit,
       original_plan_coverage_repair_mode: isExpansionWorkflow && savedGenerationOptions.enableOriginalPlanCoverageAudit ? savedGenerationOptions.originalPlanCoverageRepairMode : undefined,
-    }, config);
+    });
     setGenerationDialogOpen(false);
     showToast(regenerate ? '正文重新生成任务已在后台启动' : '正文生成任务已在后台启动', 'success');
   };
@@ -804,7 +802,7 @@ function ContentEditPage({
           : completedCount > 0
             ? 'continue'
             : 'start';
-      await launchContentGeneration({ savedGenerationOptions, nextImageModelAvailable, config, regenerate, contentGenerationAction });
+      await launchContentGeneration({ savedGenerationOptions, nextImageModelAvailable, regenerate, contentGenerationAction });
     } catch (error) {
       showToast(error instanceof Error ? error.message : '启动正文生成任务失败', 'error');
     }
@@ -849,7 +847,7 @@ function ContentEditPage({
         consistency_repair_mode: savedGenerationOptions.enableConsistencyAudit ? savedGenerationOptions.consistencyRepairMode : undefined,
         enable_original_plan_coverage_audit: isExpansionWorkflow && savedGenerationOptions.enableOriginalPlanCoverageAudit,
         original_plan_coverage_repair_mode: isExpansionWorkflow && savedGenerationOptions.enableOriginalPlanCoverageAudit ? 'normal' : undefined,
-      }, config);
+      });
       setSelectedItemId(requirementItem.id);
       setRequirementItem(null);
       setRegenerateRequirement('');

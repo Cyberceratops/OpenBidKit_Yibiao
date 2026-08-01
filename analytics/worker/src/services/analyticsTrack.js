@@ -4,6 +4,8 @@ import {
   AGENT_RUNTIME_MAX_RETRY_COUNT,
   AGENT_RUNTIME_STATUSES,
   AGENT_TASK_STAGE_PATTERN,
+  AI_REQUEST_PURPOSES,
+  AI_REQUEST_STATUSES,
   ALLOWED_EVENTS,
 } from '../constants.js';
 import { isValidProjectName, normalizeMetricValue, normalizeText } from '../utils.js';
@@ -106,6 +108,18 @@ function createMetricBlobs(event) {
       : '';
   const blob11 = event.event === 'ai_request' ? event.aiModelName : '';
   const blob12 = event.event === 'ai_request' ? event.aiRequestType : '';
+  const blob19 = isStageRuntime
+    ? event.agentTaskStage
+    : event.event === 'config_usage'
+      ? event.metricVersion
+      : event.event === 'ai_request'
+        ? event.aiRequestStatus
+        : '';
+  const blob20 = isStageRuntime
+    ? event.agentRuntimeStatus
+    : event.event === 'ai_request'
+      ? event.aiRequestPurpose
+      : '';
 
   return [
     event.projectName,
@@ -126,8 +140,8 @@ function createMetricBlobs(event) {
     event.licenseExpiresAt,
     event.sourceTrusted,
     event.untrustedReason,
-    isStageRuntime ? event.agentTaskStage : '',
-    isStageRuntime ? event.agentRuntimeStatus : '',
+    blob19,
+    blob20,
   ];
 }
 
@@ -157,7 +171,10 @@ export function normalizeTrackBody(body, request) {
     clientIp: normalizeClientIp(request),
     configKey: normalizeText(body.config_key || body.configKey, 80),
     configValue: normalizeMetricValue(body.config_value ?? body.configValue, 200),
+    metricVersion: normalizeText(body.metric_version || body.metricVersion, 40),
     aiRequestType,
+    aiRequestStatus: normalizeText(body.ai_request_status || body.aiRequestStatus, 20),
+    aiRequestPurpose: normalizeText(body.ai_request_purpose || body.aiRequestPurpose, 20),
     aiModelProvider: normalizeText(body.ai_model_provider || body.aiModelProvider, 80),
     aiModelEndpointHost: normalizeBaseUrlHost(body.ai_model_base_url || body.aiModelBaseUrl),
     aiModelName,
@@ -192,6 +209,8 @@ export function normalizeTrackBody(body, request) {
 export function validateTrackEvent(event) {
   if (!isValidProjectName(event.projectName)) return 'invalid projectName';
   if (!ALLOWED_EVENTS.has(event.event)) return 'invalid event';
+  if (event.event === 'ai_request' && event.aiRequestStatus && !AI_REQUEST_STATUSES.has(event.aiRequestStatus)) return 'invalid ai_request_status';
+  if (event.event === 'ai_request' && event.aiRequestPurpose && !AI_REQUEST_PURPOSES.has(event.aiRequestPurpose)) return 'invalid ai_request_purpose';
   if (event.event === 'agent_runtime' && !AGENT_RUNTIME_KIND_PATTERN.test(event.agentRuntimeKind)) return 'invalid agent_runtime_kind';
   if (event.event === 'agent_runtime' && !AGENT_RUNTIME_STATUSES.has(event.agentRuntimeStatus)) return 'invalid agent_runtime_status';
   if (event.event === 'agent_runtime' && event.agentTaskStage && !AGENT_TASK_STAGE_PATTERN.test(event.agentTaskStage)) return 'invalid agent_task_stage';

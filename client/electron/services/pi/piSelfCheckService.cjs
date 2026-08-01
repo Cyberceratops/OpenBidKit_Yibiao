@@ -791,6 +791,7 @@ async function analyzePiSelfCheckWithModel(aiService, input) {
       max_retries: 1,
       timeout_ms: 60000,
       logTitle: 'Pi智能体自检诊断',
+      analytics_purpose: 'test',
     });
     return {
       success: true,

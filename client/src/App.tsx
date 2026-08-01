@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import AppRouter from './app/AppRouter';
 import AppShell from './components/AppShell';
-import { trackAppOpen, trackConfigUsage, trackPageView } from './shared/analytics/analytics';
+import { trackAppOpen, trackPageView } from './shared/analytics/analytics';
 import type { SectionId } from './shared/types/navigation';
 
 function isDeveloperSection(section: SectionId) {
@@ -19,7 +19,6 @@ function App() {
     void window.yibiao?.config.load()
       .then((config) => {
         setDeveloperMode(Boolean(config?.developer_mode));
-        trackConfigUsage({}, config);
       })
       .catch((error) => console.warn('读取开发者模式失败', error));
   }, []);

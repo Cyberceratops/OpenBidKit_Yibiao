@@ -1,5 +1,7 @@
 export const DATASET = 'openbidkit_yibiao_analytics';
 export const ALLOWED_EVENTS = new Set(['app_open', 'page_view', 'config_usage', 'ai_request', 'resource_click', 'agent_runtime', 'workflow_stage_runtime']);
+export const AI_REQUEST_STATUSES = new Set(['success', 'failed']);
+export const AI_REQUEST_PURPOSES = new Set(['production', 'test']);
 export const AGENT_RUNTIME_STATUSES = new Set(['success', 'failed']);
 export const AGENT_RUNTIME_MAX_RETRY_COUNT = 3;
 export const AGENT_RUNTIME_KIND_PATTERN = /^[a-z0-9][a-z0-9._-]{0,39}$/;
@@ -45,6 +47,7 @@ export const CONFIG_USAGE_FIELDS = [
   { key: 'enableConsistencyAudit' },
   { key: 'consistencyRepairModes' },
   { key: 'enableOriginalPlanCoverageAudit' },
+  { key: 'originalPlanCoverageRepairModes' },
   { key: 'useMermaidImages' },
   { key: 'useAiImages' },
 ];

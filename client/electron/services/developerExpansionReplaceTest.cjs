@@ -118,6 +118,7 @@ function createDeveloperExpansionReplaceTestService({ aiService }) {
       validator: developerReplaceTestValidateFormalReplacePatch,
       repairMessagesBuilder: (contextForRepair) => buildContentExpansionRepairMessages(contextForRepair, originalContent),
       max_retries: 1,
+      analytics_purpose: 'test',
     });
 
     let nextContent = '';

@@ -176,14 +176,6 @@ function booleanText(value: boolean | undefined) {
   return value ? 'true' : 'false';
 }
 
-function buildBaseConfigUsage(config?: ClientConfig | null): ConfigUsagePayload {
-  return {
-    file_parser_provider: config?.components?.file_parser?.provider,
-    image_provider: config?.image_model?.provider,
-    image_model_status: config?.image_model?.status || undefined,
-  };
-}
-
 function normalizeUsagePayload(payload: ConfigUsagePayload) {
   return {
     ...payload,
@@ -241,29 +233,16 @@ export function trackPageView(page: string) {
   sendAnalytics('page_view', normalizedPage);
 }
 
-export function trackConfigUsage(payload: ConfigUsagePayload = {}, config?: ClientConfig | null) {
-  const send = (loadedConfig?: ClientConfig | null) => {
-    const usagePayload = normalizeUsagePayload({
-      ...buildBaseConfigUsage(loadedConfig),
-      ...payload,
+export function trackConfigUsage(payload: ConfigUsagePayload = {}) {
+  const usagePayload = normalizeUsagePayload(payload);
+
+  for (const [payloadKey, configKey] of configUsageFields) {
+    const configValue = configUsageValueText(usagePayload[payloadKey]);
+    if (!configValue) continue;
+    sendAnalytics('config_usage', '', {
+      config_key: configKey,
+      config_value: configValue,
+      metric_version: 'config-usage-v2',
     });
-
-    for (const [payloadKey, configKey] of configUsageFields) {
-      const configValue = configUsageValueText(usagePayload[payloadKey]);
-      if (!configValue) continue;
-      sendAnalytics('config_usage', '', {
-        config_key: configKey,
-        config_value: configValue,
-      });
-    }
-  };
-
-  if (config) {
-    send(config);
-    return;
   }
-
-  void window.yibiao?.config.load()
-    .then((loadedConfig) => send(loadedConfig))
-    .catch(() => send(null));
 }

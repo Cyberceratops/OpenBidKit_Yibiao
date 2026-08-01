@@ -68,6 +68,7 @@ function DeveloperTestPage() {
         ],
         response_format: textTask.output === 'json' ? { type: 'json_object' } : undefined,
         logTitle: `开发者测试-${textTask.label}`,
+        analytics_purpose: 'test',
       });
       setContent(nextContent);
       appendEvent('文本请求完成。');
@@ -87,6 +88,7 @@ function DeveloperTestPage() {
       const outline = await requestOutlineGeneration({
         ...sampleOutlineInput,
         onProgress: appendEvent,
+        analyticsPurpose: 'test',
       });
       setResult(JSON.stringify(outline, null, 2));
       appendEvent('JSON 请求完成。');
